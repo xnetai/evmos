@@ -39,6 +39,9 @@ func init() {
 		DisplayDenom: xcoinDenom,
 		Decimals:     evmtypes.EighteenDecimals,
 	}
+	
+	// Note: We can't populate the global portPool here because it's in the network package
+	// Instead, we'll set explicit addresses in the config
 }
 
 const (
