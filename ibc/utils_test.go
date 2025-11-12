@@ -229,6 +229,16 @@ func TestGetReceivedCoin(t *testing.T) {
 			"10",
 			sdk.Coin{Denom: teststypes.UatomOsmoIbcdenom, Amount: math.NewInt(10)},
 		},
+		{
+			"transfer unwrapped xcoin to destination which is not its source",
+			"transfer",
+			"channel-2",
+			"transfer",
+			"channel-2",
+			"xcoin",
+			"10",
+			sdk.Coin{Denom: teststypes.XcoinIbcdenom, Amount: math.NewInt(10)},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -274,6 +284,12 @@ func TestGetSentCoin(t *testing.T) {
 			"transfer/channel-0/transfer/channel-1/uatom",
 			"10",
 			sdk.Coin{Denom: teststypes.UatomOsmoIbcdenom, Amount: math.NewInt(10)},
+		},
+		{
+			"get ibc wrapped xcoin coin",
+			"transfer/channel-2/xcoin",
+			"10",
+			sdk.Coin{Denom: teststypes.XcoinIbcdenom, Amount: math.NewInt(10)},
 		},
 	}
 

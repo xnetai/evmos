@@ -38,4 +38,10 @@ var (
 		BaseDenom: evmostypes.BaseDenom,
 	}
 	AevmosIbcdenom = AevmosDenomtrace.IBCDenom()
+
+	XcoinDenomtrace = transfertypes.DenomTrace{
+		Path:      "transfer/channel-2",
+		BaseDenom: "xcoin",
+	}
+	XcoinIbcdenom = XcoinDenomtrace.IBCDenom()
 )
