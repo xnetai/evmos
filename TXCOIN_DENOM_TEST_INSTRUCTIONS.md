@@ -66,37 +66,53 @@ git checkout claude/test-txcoin-denom-config-01WVp937b3iAQoxDJ6mN1923
 
 ### Run the Test
 
-#### Option 1: Using PowerShell
-```powershell
-# Set timeout to 30 minutes (1800 seconds)
-$env:GO_TEST_TIMEOUT="30m"
+**IMPORTANT: Clear build cache first to avoid CGO issues**
 
-# Run the comprehensive denomination config test
-go test -v -timeout=30m ./testutil/integration/evmos/network -run TestTxCoinDenomConfiguration
+```powershell
+# Clear Go build cache
+go clean -cache -modcache -testcache
+```
+
+#### Option 1: Using PowerShell (Recommended)
+
+```powershell
+# Set environment variables (run separately)
+$env:PATH = "C:\ProgramData\mingw64\mingw64\bin;" + $env:PATH
+$env:CGO_ENABLED = "1"
+$env:CC = "gcc"
+
+# Verify GCC is available
+gcc --version
+
+# Run the comprehensive denomination test
+go test -v ./testutil/integration/evmos/network -run TestTxCoinDenomConfiguration -timeout 10m
 
 # Run the decimals verification test
-go test -v -timeout=30m ./testutil/integration/evmos/network -run TestTxCoinWith18Decimals
+go test -v ./testutil/integration/evmos/network -run TestTxCoinWith18Decimals -timeout 10m
 
-# Or run both tests
-go test -v -timeout=30m ./testutil/integration/evmos/network -run "TestTxCoin"
+# Or run both tests together
+go test -v ./testutil/integration/evmos/network -run "TestTxCoin" -timeout 10m
 ```
 
 #### Option 2: Using Git Bash or WSL
+
 ```bash
-# Run the comprehensive denomination config test
-timeout 1800 go test -v -timeout=30m ./testutil/integration/evmos/network -run TestTxCoinDenomConfiguration
+# Clear cache
+go clean -cache -modcache -testcache
 
-# Run the decimals verification test
-timeout 1800 go test -v -timeout=30m ./testutil/integration/evmos/network -run TestTxCoinWith18Decimals
+# Set environment and run
+export CGO_ENABLED=1
+export CC=gcc
 
-# Or run both tests
-timeout 1800 go test -v -timeout=30m ./testutil/integration/evmos/network -run "TestTxCoin"
+# Run the test
+go test -v ./testutil/integration/evmos/network -run TestTxCoinDenomConfiguration -timeout 10m
 ```
 
-#### Option 3: Using Make (if available)
-```bash
-# Create a custom make target in Makefile or run directly
-make test-integration
+#### Option 3: Single Command (PowerShell)
+
+```powershell
+# After clearing cache
+$env:CGO_ENABLED="1"; $env:CC="gcc"; go test -v ./testutil/integration/evmos/network -run TestTxCoinDenomConfiguration -timeout 10m
 ```
 
 ### Expected Test Output
@@ -181,6 +197,51 @@ The comprehensive test verifies the following:
    - State transitions work properly
 
 ### Troubleshooting
+
+#### CGO Signature Error (Most Common Issue)
+
+If you see an error like:
+```
+assignment mismatch: 2 variables but btc_ecdsa.SignCompact returns 1 value
+```
+
+This means CGO isn't properly enabled. **Follow these steps in order:**
+
+1. **Verify GCC is installed and in PATH:**
+   ```powershell
+   gcc --version
+   # Should show: gcc (MinGW-W64 x86_64...) or similar
+   ```
+
+   If not found, install MinGW-w64:
+   - Download from: https://www.mingw-w64.org/downloads/
+   - Or via Chocolatey: `choco install mingw`
+   - Add to PATH: `C:\ProgramData\mingw64\mingw64\bin`
+
+2. **Clear ALL caches:**
+   ```powershell
+   go clean -cache
+   go clean -modcache
+   go clean -testcache
+   Remove-Item -Recurse -Force $env:TEMP\go-build -ErrorAction SilentlyContinue
+   ```
+
+3. **Set environment variables in same PowerShell session:**
+   ```powershell
+   $env:CGO_ENABLED = "1"
+   $env:CC = "gcc"
+   $env:PATH = "C:\ProgramData\mingw64\mingw64\bin;" + $env:PATH
+
+   # Verify they're set
+   echo "CGO_ENABLED: $env:CGO_ENABLED"
+   echo "CC: $env:CC"
+   gcc --version
+   ```
+
+4. **Run the test in the SAME PowerShell session:**
+   ```powershell
+   go test -v ./testutil/integration/evmos/network -run TestTxCoinDenomConfiguration -timeout 10m
+   ```
 
 #### Test Fails to Build
 ```powershell
