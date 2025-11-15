@@ -30,39 +30,39 @@ func generateBankGenesisMetadata(chainID string) banktypes.Metadata {
 	if utils.IsTestnet(chainID) {
 		return banktypes.Metadata{
 			Description: "The native EVM, governance and staking token of the Evmos testnet",
-			Base:        "atevmos",
+			Base:        "ttxcoin",
 			DenomUnits: []*banktypes.DenomUnit{
 				{
-					Denom:    "atevmos",
+					Denom:    "ttxcoin",
 					Exponent: 0,
 				},
 				{
-					Denom:    "tevmos",
+					Denom:    "txcoin",
 					Exponent: 18,
 				},
 			},
-			Name:    "tEvmos",
-			Symbol:  "tEVMOS",
-			Display: "tevmos",
+			Name:    "tXCoin",
+			Symbol:  "tXCOIN",
+			Display: "txcoin",
 		}
 	}
 
 	return banktypes.Metadata{
 		Description: "The native EVM, governance and staking token of the Evmos mainnet",
-		Base:        "aevmos",
+		Base:        "txcoin",
 		DenomUnits: []*banktypes.DenomUnit{
 			{
-				Denom:    "aevmos",
+				Denom:    "txcoin",
 				Exponent: 0,
 			},
 			{
-				Denom:    "evmos",
+				Denom:    "xcoin",
 				Exponent: 18,
 			},
 		},
-		Name:    "Evmos",
-		Symbol:  "EVMOS",
-		Display: "evmos",
+		Name:    "XCoin",
+		Symbol:  "XCOIN",
+		Display: "xcoin",
 	}
 }
 

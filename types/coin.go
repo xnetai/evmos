@@ -16,16 +16,16 @@ const (
 	// - Governance parameters: denomination used for spam prevention in proposal deposits
 	// - Crisis parameters: constant fee denomination used for spam prevention to check broken invariant
 	// - EVM parameters: denomination used for running EVM state transitions in Evmos.
-	BaseDenom        string = "aevmos"
-	BaseDenomTestnet string = "atevmos"
+	BaseDenom        string = "txcoin"
+	BaseDenomTestnet string = "ttxcoin"
 
 	// BaseDenomUnit defines the base denomination unit for Evmos.
-	// 1 evmos = 1x10^{BaseDenomUnit} aevmos
+	// 1 xcoin = 1x10^{BaseDenomUnit} txcoin
 	BaseDenomUnit = 18
 
 	// DisplayDenom defines the denomination displayed to users in client applications.
-	DisplayDenom        string = "evmos"
-	DisplayDenomTestnet string = "tevmos"
+	DisplayDenom        string = "xcoin"
+	DisplayDenomTestnet string = "txcoin"
 
 	// DefaultGasPrice is default gas price for evm transactions
 	DefaultGasPrice = 20
