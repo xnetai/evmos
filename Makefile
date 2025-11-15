@@ -6,7 +6,7 @@ TMVERSION := $(shell go list -m github.com/cometbft/cometbft | sed 's:.* ::')
 COMMIT := $(shell git log -1 --format='%H')
 LEDGER_ENABLED ?= true
 BINDIR ?= $(GOPATH)/bin
-EVMOS_BINARY = evmosd
+EVMOS_BINARY = xcoind
 EVMOS_DIR = evmos
 BUILDDIR ?= $(CURDIR)/build
 HTTPS_GIT := https://github.com/evmos/evmos.git
@@ -75,7 +75,7 @@ build_tags := $(strip $(build_tags))
 
 # process linker flags
 
-ldflags = -X github.com/cosmos/cosmos-sdk/version.Name=evmos \
+ldflags = -X github.com/cosmos/cosmos-sdk/version.Name=xcoin \
           -X github.com/cosmos/cosmos-sdk/version.AppName=$(EVMOS_BINARY) \
           -X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
           -X github.com/cosmos/cosmos-sdk/version.Commit=$(COMMIT) \
@@ -154,7 +154,7 @@ build-reproducible: go.sum
 	$(DOCKER) rm latest-build || true
 	$(DOCKER) run --volume=$(CURDIR):/sources:ro \
         --env TARGET_PLATFORMS='linux/amd64' \
-        --env APP=evmosd \
+        --env APP=xcoind \
         --env VERSION=$(VERSION) \
         --env COMMIT=$(COMMIT) \
         --env CGO_ENABLED=1 \
@@ -169,22 +169,22 @@ build-docker-goleveldb:
 	$(DOCKER) tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
 	# docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:${COMMIT_HASH}
 	# move the binaries to the ./build directory
-	mkdir -p ./build/.evmosd
-	echo '#!/usr/bin/env bash' > ./build/evmosd
-	echo "IMAGE_NAME=${DOCKER_IMAGE}:${COMMIT_HASH}" >> ./build/evmosd
-	echo 'SCRIPT_PATH=$$(cd $$(dirname $$0) && pwd -P)' >> ./build/evmosd
-	echo 'docker run -it --rm -v $${SCRIPT_PATH}/.evmosd:/home/evmos/.evmosd $$IMAGE_NAME evmosd "$$@"' >> ./build/evmosd
-	chmod +x ./build/evmosd
+	mkdir -p ./build/.xcoind
+	echo '#!/usr/bin/env bash' > ./build/xcoind
+	echo "IMAGE_NAME=${DOCKER_IMAGE}:${COMMIT_HASH}" >> ./build/xcoind
+	echo 'SCRIPT_PATH=$$(cd $$(dirname $$0) && pwd -P)' >> ./build/xcoind
+	echo 'docker run -it --rm -v $${SCRIPT_PATH}/.xcoind:/home/evmos/.xcoind $$IMAGE_NAME xcoind "$$@"' >> ./build/xcoind
+	chmod +x ./build/xcoind
 
 build-docker-pebbledb:
 	DOCKER_BUILDKIT=1 $(DOCKER) build --build-arg DB_BACKEND=pebbledb -t ${DOCKER_IMAGE}:${DOCKER_TAG}-pebble ${DOCKER_ARGS} .
 	$(DOCKER) tag ${DOCKER_IMAGE}:${DOCKER_TAG}-pebble ${DOCKER_IMAGE}:latest-pebble
-	mkdir -p ./build/.evmosd
-	echo '#!/usr/bin/env bash' > ./build/evmosd
-	echo "IMAGE_NAME=${DOCKER_IMAGE}:${COMMIT_HASH}" >> ./build/evmosd
-	echo 'SCRIPT_PATH=$$(cd $$(dirname $$0) && pwd -P)' >> ./build/evmosd
-	echo 'docker run -it --rm -v $${SCRIPT_PATH}/.evmosd:/home/evmos/.evmosd $$IMAGE_NAME evmosd "$$@"' >> ./build/evmosd
-	chmod +x ./build/evmosd
+	mkdir -p ./build/.xcoind
+	echo '#!/usr/bin/env bash' > ./build/xcoind
+	echo "IMAGE_NAME=${DOCKER_IMAGE}:${COMMIT_HASH}" >> ./build/xcoind
+	echo 'SCRIPT_PATH=$$(cd $$(dirname $$0) && pwd -P)' >> ./build/xcoind
+	echo 'docker run -it --rm -v $${SCRIPT_PATH}/.xcoind:/home/evmos/.xcoind $$IMAGE_NAME xcoind "$$@"' >> ./build/xcoind
+	chmod +x ./build/xcoind
 
 build-rocksdb:
 	# Make sure to run this command with root permission
@@ -353,7 +353,7 @@ test-e2e:
 		make build-docker-pebbledb; \
 	fi
 	@mkdir -p ./build
-	@rm -rf build/.evmosd
+	@rm -rf build/.xcoind
 	@INITIAL_VERSION=$(INITIAL_VERSION) TARGET_VERSION=$(TARGET_VERSION) \
 	E2E_SKIP_CLEANUP=$(E2E_SKIP_CLEANUP) MOUNT_PATH=$(MOUNT_PATH) CHAIN_ID=$(CHAIN_ID) \
 	go test -v ./tests/e2e -run ^TestIntegrationTestSuite$

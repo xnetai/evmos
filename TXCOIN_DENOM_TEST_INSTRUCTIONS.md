@@ -1,22 +1,29 @@
-# TxCoin Denomination Configuration Test Instructions
+# XCoin Denomination Configuration Test Instructions
 
-This branch contains changes to configure the Evmos chain to use **`txcoin`** as the base denomination and **`xcoin`** as the display denomination, along with comprehensive integration tests to verify the changes.
+This branch contains changes to configure the XCoin chain (formerly Evmos) to use **`txcoin`** as the base denomination and **`xcoin`** as the display denomination, with the binary renamed from `evmosd` to **`xcoind`**, along with comprehensive integration tests to verify the changes.
 
 ## Changes Made
 
-### 1. Core Denomination Configuration
+### 1. Binary Renamed
+- **Changed**: `evmosd` → `xcoind`
+- **Files**:
+  - Renamed `cmd/evmosd/` → `cmd/xcoind/`
+  - Updated `Makefile` to build `xcoind` binary
+  - Updated version name from `evmos` to `xcoin`
+
+### 2. Core Denomination Configuration
 - **File**: `types/coin.go`
   - Base denom changed from `aevmos` to `txcoin`
   - Display denom changed from `evmos` to `xcoin`
   - Testnet base denom changed from `atevmos` to `ttxcoin`
   - Testnet display denom changed from `tevmos` to `txcoin`
 
-### 2. Bank Metadata Configuration
+### 3. Bank Metadata Configuration
 - **File**: `testutil/integration/evmos/network/chain_id_modifiers.go`
   - Updated bank genesis metadata to use new denominations
   - Updated metadata name, symbol, and description
 
-### 3. Comprehensive Test Suite
+### 4. Comprehensive Test Suite
 - **File**: `testutil/integration/evmos/network/denom_config_test.go`
   - `TestTxCoinDenomConfiguration`: Full integration test that:
     - Starts a local test network

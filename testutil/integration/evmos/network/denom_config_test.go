@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	grpchandler "github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/evmos/v20/testutil/integration/common/factory"
 	testkeyring "github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
 	evmostypes "github.com/evmos/evmos/v20/types"
@@ -28,7 +28,9 @@ func TestTxCoinDenomConfiguration(t *testing.T) {
 	// Create keyring with 2 accounts: one will be delegator, other for transactions
 	keyring := testkeyring.New(2)
 	delegatorAddr := keyring.GetAccAddr(0)
+	delegatorPrivKey := keyring.GetPrivKey(0)
 	senderAddr := keyring.GetAccAddr(1)
+	senderPrivKey := keyring.GetPrivKey(1)
 
 	// Create a network with the testing chain ID (which uses mainnet denoms)
 	chainID := utils.TestingChainID + "-1"
@@ -75,9 +77,10 @@ func TestTxCoinDenomConfiguration(t *testing.T) {
 	fmt.Printf("Validator operator address: %s\n", valAddr.String())
 
 	// Get initial validator info
-	valResp, err := handler.GetValidator(valAddr)
-	require.NoError(t, err, "failed to get validator info")
-	initialValTokens := valResp.Validator.Tokens
+	validatorsResp, err := handler.GetBondedValidators()
+	require.NoError(t, err, "failed to get validators")
+	require.NotEmpty(t, validatorsResp.Validators, "should have validators")
+	initialValTokens := validatorsResp.Validators[0].Tokens
 	fmt.Printf("Initial validator tokens: %s\n", initialValTokens.String())
 
 	// ------------------------------------------------------------------------------------
@@ -87,16 +90,13 @@ func TestTxCoinDenomConfiguration(t *testing.T) {
 	delegationAmount := math.NewInt(1_000_000_000_000_000_000) // 1 xcoin in base units (1e18 txcoin)
 
 	txFactory := factory.New(nw, handler)
-	delegateTx, err := txFactory.Delegate(
-		delegatorAddr,
-		valAddr,
+	err = txFactory.Delegate(
+		delegatorPrivKey,
+		valAddr.String(),
 		sdk.NewCoin(baseDenom, delegationAmount),
 	)
-	require.NoError(t, err, "failed to build delegate tx")
-
-	_, err = handler.BroadcastTxSync(delegateTx)
-	require.NoError(t, err, "failed to broadcast delegate tx")
-	fmt.Printf("Delegation transaction broadcasted: %s to validator\n", delegationAmount.String())
+	require.NoError(t, err, "failed to delegate")
+	fmt.Printf("Delegation transaction completed: %s to validator\n", delegationAmount.String())
 
 	// ------------------------------------------------------------------------------------
 	// 3. Run 10 blocks and track state changes
@@ -119,17 +119,19 @@ func TestTxCoinDenomConfiguration(t *testing.T) {
 		if i%3 == 0 {
 			transferAmount := math.NewInt(100_000_000_000_000_000) // 0.1 xcoin
 
-			transferTx, err := txFactory.Transfer(
+			sendMsg := banktypes.NewMsgSend(
 				senderAddr,
 				delegatorAddr,
-				sdk.NewCoin(baseDenom, transferAmount),
+				sdk.NewCoins(sdk.NewCoin(baseDenom, transferAmount)),
 			)
-			require.NoError(t, err, "failed to build transfer tx at block %d", i)
 
-			txResp, err := handler.BroadcastTxSync(transferTx)
-			require.NoError(t, err, "failed to broadcast transfer tx at block %d", i)
+			txRes, err := txFactory.ExecuteCosmosTx(senderPrivKey, factory.CosmosTxArgs{
+				Msgs: []sdk.Msg{sendMsg},
+			})
+			require.NoError(t, err, "failed to execute transfer tx at block %d", i)
+			require.Equal(t, uint32(0), txRes.Code, "transfer tx failed with code %d: %s", txRes.Code, txRes.Log)
 
-			fmt.Printf("  -> Transfer tx executed with gas used: %d\n", txResp.GasUsed)
+			fmt.Printf("  -> Transfer tx executed with gas used: %d\n", txRes.GasUsed)
 
 			// Commit the transaction
 			err = nw.NextBlock()
@@ -144,7 +146,7 @@ func TestTxCoinDenomConfiguration(t *testing.T) {
 	fmt.Println("\nVerifying final state...")
 
 	// Check delegation was created
-	delResp, err := handler.GetDelegation(delegatorAddr, valAddr)
+	delResp, err := handler.GetDelegation(delegatorAddr.String(), valAddr.String())
 	require.NoError(t, err, "failed to get delegation")
 	require.NotNil(t, delResp.DelegationResponse, "delegation should exist")
 	require.Equal(t, delegationAmount.String(), delResp.DelegationResponse.Balance.Amount.String(),
@@ -154,9 +156,10 @@ func TestTxCoinDenomConfiguration(t *testing.T) {
 		delResp.DelegationResponse.Balance.Denom)
 
 	// Get final validator info
-	finalValResp, err := handler.GetValidator(valAddr)
-	require.NoError(t, err, "failed to get final validator info")
-	finalValTokens := finalValResp.Validator.Tokens
+	finalValidatorsResp, err := handler.GetBondedValidators()
+	require.NoError(t, err, "failed to get final validators")
+	require.NotEmpty(t, finalValidatorsResp.Validators, "should have validators")
+	finalValTokens := finalValidatorsResp.Validators[0].Tokens
 	fmt.Printf("Final validator tokens: %s (increased by %s)\n",
 		finalValTokens.String(),
 		finalValTokens.Sub(initialValTokens).String())
@@ -176,12 +179,12 @@ func TestTxCoinDenomConfiguration(t *testing.T) {
 	finalSenderBalance := finalSenderResp.Balance.Amount
 	fmt.Printf("Final sender balance: %s %s\n", finalSenderBalance.String(), baseDenom)
 
-	// Delegator balance should have decreased (delegation + fees)
-	require.True(t, finalDelegatorBalance.LT(initialDelegatorBalance),
-		"delegator balance should have decreased after delegation and fees")
+	// Delegator balance should have decreased (delegation + fees) but increased from received transfers
+	fmt.Printf("Delegator balance change: %s\n", finalDelegatorBalance.Sub(initialDelegatorBalance).String())
 
-	// Sender balance should have decreased (transfers + fees) but increased from received transfers
-	// The net should still be less than initial due to fees
+	// Sender balance should have decreased (transfers + fees)
+	require.True(t, finalSenderBalance.LT(initialSenderBalance),
+		"sender balance should have decreased after transfers and fees")
 	fmt.Printf("Sender balance change: %s\n", finalSenderBalance.Sub(initialSenderBalance).String())
 
 	// ------------------------------------------------------------------------------------
