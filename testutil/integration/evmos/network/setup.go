@@ -167,12 +167,6 @@ func createBalances(
 
 // createEvmosApp creates an evmos app
 func createEvmosApp(chainID string, customBaseAppOptions ...func(*baseapp.BaseApp)) *app.Evmos {
-	// Set Bech32 prefixes before creating validators
-	config := sdktypes.GetConfig()
-	cmdcfg.SetBech32Prefixes(config)
-	cmdcfg.SetBip44CoinType(config)
-	config.Seal()
-
 	// Create evmos app
 	db := dbm.NewMemDB()
 	logger := log.NewNopLogger()
