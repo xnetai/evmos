@@ -37,9 +37,10 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 	senderAddr := keyring.GetAccAddr(1)
 	senderPrivKey := keyring.GetPrivKey(1)
 
-	// Create network
+	// Create network with txcoin denomination
 	nw := network.New(
 		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
+		network.WithDenom(evmostypes.AttoEvmos), // Use txcoin as the base denomination
 	)
 
 	// Create handlers for queries and transactions
