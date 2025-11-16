@@ -4,11 +4,10 @@
 package network_test
 
 import (
-	"fmt"
-	"math/big"
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
@@ -36,7 +35,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	// Initialize keyring with 4 delegators
 	keyring := keyring.New(4)
 	delegators := make([]sdk.AccAddress, 4)
-	delegatorPrivKeys := make([]sdk.PrivKey, 4)
+	delegatorPrivKeys := make([]cryptotypes.PrivKey, 4)
 	for i := 0; i < 4; i++ {
 		delegators[i] = keyring.GetAccAddr(i)
 		delegatorPrivKeys[i] = keyring.GetPrivKey(i)
@@ -233,7 +232,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 
 	// Query rewards for all delegators
 	t.Log("\n=== Delegation Rewards ===")
-	distrClient := nw.GetDistrClient()
+	distrClient := nw.GetDistributionClient()
 	for i := 0; i < 4; i++ {
 		valAddr := validatorsResp.Validators[i].OperatorAddress
 

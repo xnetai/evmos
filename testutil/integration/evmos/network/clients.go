@@ -8,6 +8,7 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -80,4 +81,10 @@ func (n *IntegrationNetwork) GetStakingClient() stakingtypes.QueryClient {
 	queryHelper := getQueryHelper(n.GetContext())
 	stakingtypes.RegisterQueryServer(queryHelper, stakingkeeper.Querier{Keeper: n.app.StakingKeeper.Keeper})
 	return stakingtypes.NewQueryClient(queryHelper)
+}
+
+func (n *IntegrationNetwork) GetDistributionClient() distrtypes.QueryClient {
+	queryHelper := getQueryHelper(n.GetContext())
+	distrtypes.RegisterQueryServer(queryHelper, n.app.DistrKeeper)
+	return distrtypes.NewQueryClient(queryHelper)
 }
