@@ -250,9 +250,9 @@ func TestDeployFiveERC20Tokens(t *testing.T) {
 
 	// Initialize keyring with 2 accounts
 	keyring := keyring.New(2)
-	deployerAddr := keyring.GetAccAddr(0)
+	deployerAddr := keyring.GetAddr(0)      // Ethereum address
 	deployerPrivKey := keyring.GetPrivKey(0)
-	userAddr := keyring.GetAccAddr(1)
+	userAddr := keyring.GetAddr(1)          // Ethereum address
 	userPrivKey := keyring.GetPrivKey(1)
 
 	// Create network with txcoin denomination
