@@ -223,5 +223,5 @@ func isXCoinAddress(addr string) bool {
 
 // isXCoinValidatorAddress checks if a validator address starts with xcoinvaloper1
 func isXCoinValidatorAddress(addr string) bool {
-	return len(addr) > 14 && addr[:14] == "xcoinvaloper1"
+	return len(addr) >= 13 && addr[:13] == "xcoinvaloper1"
 }
