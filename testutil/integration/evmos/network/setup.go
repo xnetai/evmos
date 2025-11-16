@@ -36,7 +36,6 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	evmostypes "github.com/evmos/evmos/v20/types"
-	cmdcfg "github.com/evmos/evmos/v20/cmd/config"
 	epochstypes "github.com/evmos/evmos/v20/x/epochs/types"
 	erc20types "github.com/evmos/evmos/v20/x/erc20/types"
 	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
