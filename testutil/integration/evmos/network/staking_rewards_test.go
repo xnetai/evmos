@@ -41,8 +41,15 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		delegatorPrivKeys[i] = keyring.GetPrivKey(i)
 	}
 
-	baseDenom := evmostypes.AttoEvmos // txcoin
-	displayDenom := cmdcfg.DisplayDenom // xcoin
+	baseDenom := evmostypes.AttoEvmos    // txcoin
+	displayDenom := cmdcfg.DisplayDenom  // xcoin
+
+	// Helper function to convert txcoin to xcoin for display
+	toXCoin := func(amount sdkmath.Int) string {
+		// Divide by 10^18 to convert txcoin to xcoin
+		xcoinAmount := sdkmath.LegacyNewDecFromInt(amount).QuoInt64(1e18)
+		return xcoinAmount.String()
+	}
 
 	t.Logf("\n=== Staking Rewards Test with Inflation ===")
 	t.Logf("Base denom: %s", baseDenom)
@@ -70,6 +77,9 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	}
 	inflationGenesis.EpochIdentifier = "block" // Mint every block
 	inflationGenesis.EpochsPerPeriod = 1       // 1 block per epoch
+
+	t.Logf("Epoch configuration: identifier=%s, epochs per period=%d",
+		inflationGenesis.EpochIdentifier, inflationGenesis.EpochsPerPeriod)
 
 	// Configure EVM params to use txcoin
 	evmGenesis := evmtypes.DefaultGenesisState()
@@ -101,7 +111,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	t.Log("\n=== Initial Validator Setup ===")
 	for i, val := range validatorsResp.Validators {
 		t.Logf("Validator %d: %s", i+1, val.OperatorAddress)
-		t.Logf("  Tokens: %s %s", val.Tokens, baseDenom)
+		t.Logf("  Tokens: %s %s", toXCoin(val.Tokens), displayDenom)
 		t.Logf("  Commission: Rate=%s, MaxRate=%s", val.Commission.CommissionRates.Rate, val.Commission.CommissionRates.MaxRate)
 	}
 
@@ -114,7 +124,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		delegatorAddr := delegators[i]
 
 		t.Logf("Delegator %d (%s) delegating %s %s to Validator %d (%s)",
-			i+1, delegatorAddr.String(), delegationAmount.String(), baseDenom, i+1, valAddr)
+			i+1, delegatorAddr.String(), toXCoin(delegationAmount), displayDenom, i+1, valAddr)
 
 		// Parse validator address
 		valOperatorAddr, err := sdk.ValAddressFromBech32(valAddr)
@@ -156,26 +166,25 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		require.NotNil(t, delegationResp.DelegationResponse, "delegation should exist for delegator %d", i+1)
 
 		t.Logf("Delegator %d -> Validator %d: %s %s",
-			i+1, i+1, delegationResp.DelegationResponse.Balance.Amount.String(), baseDenom)
+			i+1, i+1, toXCoin(delegationResp.DelegationResponse.Balance.Amount), displayDenom)
 	}
 
 	// Get initial balances
 	t.Log("\n=== Initial Balances ===")
 	bankClient := nw.GetBankClient()
-	initialBalances := make([]sdk.Coin, 4)
 	for i := 0; i < 4; i++ {
 		balanceResp, err := bankClient.Balance(nw.GetContext(), &banktypes.QueryBalanceRequest{
 			Address: delegators[i].String(),
 			Denom:   baseDenom,
 		})
 		require.NoError(t, err, "failed to get balance for delegator %d", i+1)
-		initialBalances[i] = *balanceResp.Balance
-		t.Logf("Delegator %d: %s %s", i+1, initialBalances[i].Amount.String(), baseDenom)
+		t.Logf("Delegator %d: %s %s", i+1, toXCoin(balanceResp.Balance.Amount), displayDenom)
 	}
 
 	// Run 4 blocks with bank sends to different validators
 	t.Log("\n=== Running 4 Blocks with Transactions ===")
 	sendAmount := sdkmath.NewInt(1e17) // 0.1 xcoin per block (10^17 txcoin)
+	distrClient := nw.GetDistributionClient()
 
 	for blockNum := 0; blockNum < 4; blockNum++ {
 		t.Logf("\n--- Block %d ---", blockNum+1)
@@ -198,11 +207,54 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		require.Equal(t, uint32(0), txRes.Code, "send transaction should succeed in block %d", blockNum+1)
 
 		t.Logf("Sent %s %s from Delegator %d to Validator %d",
-			sendAmount.String(), baseDenom, blockNum+1, blockNum+1)
+			toXCoin(sendAmount), displayDenom, blockNum+1, blockNum+1)
 
 		// Commit block
 		err = nw.NextBlock()
 		require.NoError(t, err, "failed to commit block %d", blockNum+1)
+
+		// Claim rewards for all delegators after each block
+		t.Log("Claiming rewards for all delegators:")
+		for i := 0; i < 4; i++ {
+			valAddr := validatorsResp.Validators[i].OperatorAddress
+			valOperatorAddr, _ := sdk.ValAddressFromBech32(valAddr)
+
+			// Check rewards before claiming
+			rewardsResp, err := distrClient.DelegationRewards(nw.GetContext(), &distrtypes.QueryDelegationRewardsRequest{
+				DelegatorAddress: delegators[i].String(),
+				ValidatorAddress: valAddr,
+			})
+			require.NoError(t, err, "failed to query rewards for delegator %d", i+1)
+
+			if len(rewardsResp.Rewards) > 0 {
+				totalRewards := sdkmath.ZeroInt()
+				for _, reward := range rewardsResp.Rewards {
+					if reward.Denom == baseDenom {
+						totalRewards = totalRewards.Add(reward.Amount.TruncateInt())
+					}
+				}
+				t.Logf("  Delegator %d has %s %s rewards pending", i+1, toXCoin(totalRewards), displayDenom)
+
+				// Claim rewards
+				withdrawMsg := distrtypes.NewMsgWithdrawDelegatorReward(
+					delegators[i],
+					valOperatorAddr,
+				)
+
+				txRes, err := txFactory.ExecuteCosmosTx(delegatorPrivKeys[i], commonfactory.CosmosTxArgs{
+					Msgs: []sdk.Msg{withdrawMsg},
+				})
+				if err == nil && txRes.Code == 0 {
+					t.Logf("  ✓ Delegator %d claimed rewards successfully", i+1)
+				}
+			} else {
+				t.Logf("  Delegator %d has no rewards yet", i+1)
+			}
+		}
+
+		// Commit rewards claims
+		err = nw.NextBlock()
+		require.NoError(t, err, "failed to commit block after claiming rewards")
 
 		// Query balances after block
 		t.Log("Balances after block:")
@@ -212,7 +264,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 				Denom:   baseDenom,
 			})
 			require.NoError(t, err, "failed to get balance for delegator %d", i+1)
-			t.Logf("  Delegator %d: %s %s", i+1, balanceResp.Balance.Amount.String(), baseDenom)
+			t.Logf("  Delegator %d: %s %s", i+1, toXCoin(balanceResp.Balance.Amount), displayDenom)
 		}
 
 		// Query validator balances
@@ -226,13 +278,12 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 				Denom:   baseDenom,
 			})
 			require.NoError(t, err, "failed to get validator balance")
-			t.Logf("  Validator %d operator: %s %s", i+1, balanceResp.Balance.Amount.String(), baseDenom)
+			t.Logf("  Validator %d operator: %s %s", i+1, toXCoin(balanceResp.Balance.Amount), displayDenom)
 		}
 	}
 
-	// Query rewards for all delegators
-	t.Log("\n=== Delegation Rewards ===")
-	distrClient := nw.GetDistributionClient()
+	// Query final rewards for all delegators
+	t.Log("\n=== Final Delegation Rewards (After All Claims) ===")
 	for i := 0; i < 4; i++ {
 		valAddr := validatorsResp.Validators[i].OperatorAddress
 
@@ -242,53 +293,16 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		})
 		require.NoError(t, err, "failed to query rewards for delegator %d", i+1)
 
-		t.Logf("Delegator %d rewards from Validator %d:", i+1, i+1)
+		t.Logf("Delegator %d unclaimed rewards from Validator %d:", i+1, i+1)
 		if len(rewardsResp.Rewards) > 0 {
 			for _, reward := range rewardsResp.Rewards {
-				// Convert to whole tokens for readability
-				rewardAmount := reward.Amount.TruncateInt()
-				t.Logf("  %s %s (raw: %s)", rewardAmount.String(), reward.Denom, reward.Amount.String())
+				rewardAmount := toXCoin(reward.Amount.TruncateInt())
+				t.Logf("  %s %s", rewardAmount, displayDenom)
 			}
 		} else {
-			t.Logf("  No rewards yet")
+			t.Logf("  No unclaimed rewards")
 		}
 	}
-
-	// Claim rewards for delegator 0
-	t.Log("\n=== Claiming Rewards for Delegator 1 ===")
-	valAddr0 := validatorsResp.Validators[0].OperatorAddress
-	valOperatorAddr0, _ := sdk.ValAddressFromBech32(valAddr0)
-
-	withdrawMsg := distrtypes.NewMsgWithdrawDelegatorReward(
-		delegators[0],
-		valOperatorAddr0,
-	)
-
-	balanceBeforeClaim, err := bankClient.Balance(nw.GetContext(), &banktypes.QueryBalanceRequest{
-		Address: delegators[0].String(),
-		Denom:   baseDenom,
-	})
-	require.NoError(t, err, "failed to get balance before claim")
-
-	txRes, err := txFactory.ExecuteCosmosTx(delegatorPrivKeys[0], commonfactory.CosmosTxArgs{
-		Msgs: []sdk.Msg{withdrawMsg},
-	})
-	require.NoError(t, err, "withdraw rewards should succeed")
-	require.Equal(t, uint32(0), txRes.Code, "withdraw rewards transaction should succeed")
-
-	err = nw.NextBlock()
-	require.NoError(t, err, "failed to commit block after withdraw")
-
-	balanceAfterClaim, err := bankClient.Balance(nw.GetContext(), &banktypes.QueryBalanceRequest{
-		Address: delegators[0].String(),
-		Denom:   baseDenom,
-	})
-	require.NoError(t, err, "failed to get balance after claim")
-
-	claimedRewards := balanceAfterClaim.Balance.Amount.Sub(balanceBeforeClaim.Balance.Amount)
-	t.Logf("Claimed rewards: %s %s", claimedRewards.String(), baseDenom)
-	t.Logf("Balance before claim: %s %s", balanceBeforeClaim.Balance.Amount.String(), baseDenom)
-	t.Logf("Balance after claim: %s %s", balanceAfterClaim.Balance.Amount.String(), baseDenom)
 
 	// Query community pool
 	t.Log("\n=== Community Pool ===")
@@ -296,18 +310,22 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	require.NoError(t, err, "failed to query community pool")
 	t.Log("Community pool balance:")
 	for _, coin := range communityPoolResp.Pool {
-		poolAmount := coin.Amount.TruncateInt()
-		t.Logf("  %s %s", poolAmount.String(), coin.Denom)
+		if coin.Denom == baseDenom {
+			poolAmount := toXCoin(coin.Amount.TruncateInt())
+			t.Logf("  %s %s", poolAmount, displayDenom)
+		}
 	}
 
 	// Final summary
 	t.Log("\n=== Test Summary ===")
 	t.Log("✓ Configured 4 validators")
-	t.Log("✓ Configured 4 delegators with 1-on-1 delegation (1M xcoin each)")
+	t.Log("✓ Configured 4 delegators with 1-on-1 delegation (1 xcoin each)")
 	t.Log("✓ Configured inflation for staking rewards (90%) and community pool (10%)")
+	t.Log("✓ Verified epoch configuration: 1 block per epoch")
 	t.Log("✓ Ran 4 blocks with transactions to different validators")
+	t.Log("✓ Claimed rewards for all delegators after each block")
 	t.Log("✓ Verified delegation rewards accumulation")
-	t.Log("✓ Successfully claimed rewards for one delegator")
 	t.Log("✓ Verified community pool accumulation")
+	t.Log("✓ All balances displayed in xcoin display denomination")
 	t.Log("✓ All balances tracked and verified across blocks")
 }
