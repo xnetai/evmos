@@ -107,7 +107,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 
 	// Perform 1-on-1 delegations: delegator i -> validator i
 	t.Log("\n=== Setting Up Delegations ===")
-	delegationAmount := sdkmath.NewInt(1_000_000).Mul(sdkmath.NewInt(1e18)) // 1,000,000 xcoin = 1M * 10^18 txcoin
+	delegationAmount := sdkmath.NewInt(1e18) // 1 xcoin = 10^18 txcoin
 
 	for i := 0; i < 4; i++ {
 		valAddr := validatorsResp.Validators[i].OperatorAddress
@@ -175,7 +175,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 
 	// Run 4 blocks with bank sends to different validators
 	t.Log("\n=== Running 4 Blocks with Transactions ===")
-	sendAmount := sdkmath.NewInt(1_000).Mul(sdkmath.NewInt(1e18)) // 1,000 xcoin per block
+	sendAmount := sdkmath.NewInt(1e17) // 0.1 xcoin per block (10^17 txcoin)
 
 	for blockNum := 0; blockNum < 4; blockNum++ {
 		t.Logf("\n--- Block %d ---", blockNum+1)
