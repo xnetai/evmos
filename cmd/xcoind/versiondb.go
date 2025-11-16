@@ -14,7 +14,7 @@ import (
 
 	versiondbclient "github.com/crypto-org-chain/cronos/versiondb/client"
 	"github.com/evmos/evmos/v19/app"
-	"github.com/evmos/evmos/v19/cmd/evmosd/opendb"
+	"github.com/evmos/evmos/v19/cmd/xcoind/opendb"
 )
 
 // ChangeSetCmd returns a Cobra command for interacting with change sets.
