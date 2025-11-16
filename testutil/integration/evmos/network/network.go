@@ -13,6 +13,7 @@ import (
 
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/evmos/evmos/v19/app"
+	cmdcfg "github.com/evmos/evmos/v19/cmd/config"
 	"github.com/evmos/evmos/v19/types"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
@@ -104,6 +105,12 @@ var (
 // configureAndInitChain initializes the network with the given configuration.
 // It creates the genesis state and starts the network.
 func (n *IntegrationNetwork) configureAndInitChain() error {
+	// Set Bech32 prefixes before creating validators
+	// This must be done early to ensure validator addresses use the correct prefix
+	config := sdktypes.GetConfig()
+	cmdcfg.SetBech32Prefixes(config)
+	cmdcfg.SetBip44CoinType(config)
+
 	// Create funded accounts based on the config and
 	// create genesis accounts
 	genAccounts, fundedAccountBalances := getGenAccountsAndBalances(n.cfg)
