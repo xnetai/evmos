@@ -198,11 +198,10 @@ func TestTxCoinDenomConfiguration(t *testing.T) {
 	fmt.Printf("Base fee: %s\n", baseFeeResp.BaseFee.String())
 
 	// Verify EVM denom configuration
-	evmParamsResp, err := handler.GetEvmParams()
-	require.NoError(t, err, "failed to get EVM params")
-	require.Equal(t, baseDenom, evmParamsResp.Params.EvmDenom,
+	evmDenom := evmtypes.GetEVMCoinDenom()
+	require.Equal(t, baseDenom, evmDenom,
 		"EVM denom should match base denom")
-	fmt.Printf("EVM denom verified: %s\n", evmParamsResp.Params.EvmDenom)
+	fmt.Printf("EVM denom verified: %s\n", evmDenom)
 
 	// ------------------------------------------------------------------------------------
 	// 6. Verify Bank Metadata
