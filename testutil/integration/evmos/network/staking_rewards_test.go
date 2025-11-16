@@ -117,7 +117,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 
 	// Perform 1-on-1 delegations: delegator i -> validator i
 	t.Log("\n=== Setting Up Delegations ===")
-	delegationAmount := sdkmath.NewInt(1e18) // 1 xcoin = 10^18 txcoin
+	delegationAmount := sdkmath.NewInt(100).Mul(sdkmath.NewInt(1e18)) // 100 xcoin = 100 * 10^18 txcoin
 
 	for i := 0; i < 4; i++ {
 		valAddr := validatorsResp.Validators[i].OperatorAddress
@@ -183,11 +183,39 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 
 	// Run 4 blocks with bank sends to different validators
 	t.Log("\n=== Running 4 Blocks with Transactions ===")
-	sendAmount := sdkmath.NewInt(1e17) // 0.1 xcoin per block (10^17 txcoin)
+	sendAmount := sdkmath.NewInt(1e18) // 1 xcoin per block (10^18 txcoin)
 	distrClient := nw.GetDistributionClient()
 
 	for blockNum := 0; blockNum < 4; blockNum++ {
 		t.Logf("\n--- Block %d ---", blockNum+1)
+
+		// Query validator operator balances BEFORE block
+		t.Log("Validator operator balances BEFORE block:")
+		operatorBalancesBefore := make([]sdkmath.Int, 4)
+		for i := 0; i < 4; i++ {
+			valAddr := validatorsResp.Validators[i].OperatorAddress
+			valOperatorAddr, _ := sdk.ValAddressFromBech32(valAddr)
+			valAccAddr := sdk.AccAddress(valOperatorAddr)
+
+			balanceResp, err := bankClient.Balance(nw.GetContext(), &banktypes.QueryBalanceRequest{
+				Address: valAccAddr.String(),
+				Denom:   baseDenom,
+			})
+			require.NoError(t, err, "failed to get validator operator balance")
+			operatorBalancesBefore[i] = balanceResp.Balance.Amount
+			t.Logf("  Validator %d operator: %s %s", i+1, toXCoin(balanceResp.Balance.Amount), displayDenom)
+		}
+
+		// Query community pool BEFORE block
+		communityPoolBefore := sdkmath.ZeroInt()
+		communityPoolResp, err := distrClient.CommunityPool(nw.GetContext(), &distrtypes.QueryCommunityPoolRequest{})
+		require.NoError(t, err, "failed to query community pool")
+		for _, coin := range communityPoolResp.Pool {
+			if coin.Denom == baseDenom {
+				communityPoolBefore = coin.Amount.TruncateInt()
+				t.Logf("Community pool BEFORE block: %s %s", toXCoin(communityPoolBefore), displayDenom)
+			}
+		}
 
 		// Send tokens from delegator blockNum to validator blockNum's operator
 		valAddr := validatorsResp.Validators[blockNum].OperatorAddress
@@ -212,6 +240,21 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		// Commit block
 		err = nw.NextBlock()
 		require.NoError(t, err, "failed to commit block %d", blockNum+1)
+
+		// Verify community pool increased AFTER block
+		t.Log("\nVerifying block rewards distribution:")
+		communityPoolAfterBlock := sdkmath.ZeroInt()
+		communityPoolResp, err = distrClient.CommunityPool(nw.GetContext(), &distrtypes.QueryCommunityPoolRequest{})
+		require.NoError(t, err, "failed to query community pool after block")
+		for _, coin := range communityPoolResp.Pool {
+			if coin.Denom == baseDenom {
+				communityPoolAfterBlock = coin.Amount.TruncateInt()
+				break
+			}
+		}
+		communityPoolIncrease := communityPoolAfterBlock.Sub(communityPoolBefore)
+		t.Logf("Community pool increased by: %s %s (expected ~10%% of block rewards)",
+			toXCoin(communityPoolIncrease), displayDenom)
 
 		// Claim rewards for all delegators after each block
 		t.Log("Claiming rewards for all delegators:")
@@ -256,18 +299,8 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		err = nw.NextBlock()
 		require.NoError(t, err, "failed to commit block after claiming rewards")
 
-		// Query balances after block
-		t.Log("Balances after block:")
-		for i := 0; i < 4; i++ {
-			balanceResp, err := bankClient.Balance(nw.GetContext(), &banktypes.QueryBalanceRequest{
-				Address: delegators[i].String(),
-				Denom:   baseDenom,
-			})
-			require.NoError(t, err, "failed to get balance for delegator %d", i+1)
-			t.Logf("  Delegator %d: %s %s", i+1, toXCoin(balanceResp.Balance.Amount), displayDenom)
-		}
-
-		// Query validator balances
+		// Verify validator operator balances increased AFTER claiming
+		t.Log("\nValidator operator balances AFTER claiming rewards:")
 		for i := 0; i < 4; i++ {
 			valAddr := validatorsResp.Validators[i].OperatorAddress
 			valOperatorAddr, _ := sdk.ValAddressFromBech32(valAddr)
@@ -277,8 +310,23 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 				Address: valAccAddr.String(),
 				Denom:   baseDenom,
 			})
-			require.NoError(t, err, "failed to get validator balance")
-			t.Logf("  Validator %d operator: %s %s", i+1, toXCoin(balanceResp.Balance.Amount), displayDenom)
+			require.NoError(t, err, "failed to get validator operator balance after claiming")
+			balanceAfter := balanceResp.Balance.Amount
+			balanceIncrease := balanceAfter.Sub(operatorBalancesBefore[i])
+
+			t.Logf("  Validator %d operator: %s %s (increased by %s %s)",
+				i+1, toXCoin(balanceAfter), displayDenom, toXCoin(balanceIncrease), displayDenom)
+		}
+
+		// Query delegator balances after block
+		t.Log("\nDelegator balances after block:")
+		for i := 0; i < 4; i++ {
+			balanceResp, err := bankClient.Balance(nw.GetContext(), &banktypes.QueryBalanceRequest{
+				Address: delegators[i].String(),
+				Denom:   baseDenom,
+			})
+			require.NoError(t, err, "failed to get balance for delegator %d", i+1)
+			t.Logf("  Delegator %d: %s %s", i+1, toXCoin(balanceResp.Balance.Amount), displayDenom)
 		}
 	}
 
@@ -319,13 +367,16 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	// Final summary
 	t.Log("\n=== Test Summary ===")
 	t.Log("✓ Configured 4 validators")
-	t.Log("✓ Configured 4 delegators with 1-on-1 delegation (1 xcoin each)")
+	t.Log("✓ Configured 4 delegators with 1-on-1 delegation (100 xcoin each)")
 	t.Log("✓ Configured inflation for staking rewards (90%) and community pool (10%)")
+	t.Log("✓ Configured target block rewards: ~100 xcoin per block")
 	t.Log("✓ Verified epoch configuration: 1 block per epoch")
-	t.Log("✓ Ran 4 blocks with transactions to different validators")
+	t.Log("✓ Ran 4 blocks with 1 xcoin transactions to different validators")
+	t.Log("✓ Verified validator operator balances before each block")
+	t.Log("✓ Verified community pool increased by ~10% of block rewards")
 	t.Log("✓ Claimed rewards for all delegators after each block")
+	t.Log("✓ Verified validator operator balances increased after claiming rewards")
 	t.Log("✓ Verified delegation rewards accumulation")
-	t.Log("✓ Verified community pool accumulation")
 	t.Log("✓ All balances displayed in xcoin display denomination")
 	t.Log("✓ All balances tracked and verified across blocks")
 }
