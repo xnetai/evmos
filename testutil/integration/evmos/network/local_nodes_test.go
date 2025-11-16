@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cmdcfg "github.com/evmos/evmos/v19/cmd/config"
+	commonfactory "github.com/evmos/evmos/v19/testutil/integration/common/factory"
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/factory"
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/grpc"
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/keyring"
@@ -31,12 +32,10 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 
 	// Create keyring with test accounts
 	keyring := keyring.New(3)
-	operatorAddr := keyring.GetAccAddr(0)
-	operatorPrivKey := keyring.GetPrivKey(0)
-	delegatorAddr := keyring.GetAccAddr(1)
-	delegatorPrivKey := keyring.GetPrivKey(1)
-	senderAddr := keyring.GetAccAddr(2)
-	senderPrivKey := keyring.GetPrivKey(2)
+	delegatorAddr := keyring.GetAccAddr(0)
+	delegatorPrivKey := keyring.GetPrivKey(0)
+	senderAddr := keyring.GetAccAddr(1)
+	senderPrivKey := keyring.GetPrivKey(1)
 
 	// Create network
 	nw := network.New(
@@ -59,28 +58,26 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 
 	// Verify Bech32 prefixes
 	require.Equal(t, "xcoin", cmdcfg.Bech32Prefix, "Bech32 prefix should be xcoin")
-	require.True(t, isXCoinAddress(operatorAddr.String()), "Operator address should start with xcoin1")
 	require.True(t, isXCoinAddress(delegatorAddr.String()), "Delegator address should start with xcoin1")
 	require.True(t, isXCoinAddress(senderAddr.String()), "Sender address should start with xcoin1")
 
 	// Get initial balances
-	operatorBalanceResp, err := handler.GetBalance(operatorAddr, baseDenom)
-	require.NoError(t, err, "failed to get operator balance")
 	delegatorBalanceResp, err := handler.GetBalance(delegatorAddr, baseDenom)
 	require.NoError(t, err, "failed to get delegator balance")
 	senderBalanceResp, err := handler.GetBalance(senderAddr, baseDenom)
 	require.NoError(t, err, "failed to get sender balance")
 
-	t.Logf("Initial operator balance: %s %s", operatorBalanceResp.Balance.Amount, baseDenom)
 	t.Logf("Initial delegator balance: %s %s", delegatorBalanceResp.Balance.Amount, baseDenom)
 	t.Logf("Initial sender balance: %s %s", senderBalanceResp.Balance.Amount, baseDenom)
 
-	require.True(t, operatorBalanceResp.Balance.Amount.GT(sdkmath.ZeroInt()), "operator should have initial balance")
 	require.True(t, delegatorBalanceResp.Balance.Amount.GT(sdkmath.ZeroInt()), "delegator should have initial balance")
 	require.True(t, senderBalanceResp.Balance.Amount.GT(sdkmath.ZeroInt()), "sender should have initial balance")
 
 	// Get validators
-	validatorsResp, err := handler.GetBondedValidators()
+	stakingClient := nw.GetStakingClient()
+	validatorsResp, err := stakingClient.Validators(nw.GetContext(), &stakingtypes.QueryValidatorsRequest{
+		Status: stakingtypes.Bonded.String(),
+	})
 	require.NoError(t, err, "failed to get validators")
 	require.NotEmpty(t, validatorsResp.Validators, "should have at least one validator")
 
@@ -96,15 +93,28 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 	delegationAmount := sdkmath.NewInt(1_000_000_000_000_000_000) // 1 xcoin = 10^18 txcoin
 	t.Logf("Delegating %s %s to validator %s", delegationAmount, baseDenom, valAddr)
 
-	err = txFactory.Delegate(delegatorPrivKey, valAddr, sdk.NewCoin(baseDenom, delegationAmount))
+	// Create delegation message
+	delegateMsg := stakingtypes.NewMsgDelegate(
+		delegatorAddr,
+		sdk.ValAddress(validator.GetOperator()),
+		sdk.NewCoin(baseDenom, delegationAmount),
+	)
+
+	txRes, err := txFactory.ExecuteCosmosTx(delegatorPrivKey, commonfactory.CosmosTxArgs{
+		Msgs: []sdk.Msg{delegateMsg},
+	})
 	require.NoError(t, err, "delegation should succeed")
+	require.Equal(t, uint32(0), txRes.Code, "delegation transaction should succeed")
 
 	// Commit the block to process the delegation
 	err = nw.NextBlock()
 	require.NoError(t, err, "failed to commit block")
 
 	// Verify delegation
-	delegationResp, err := handler.GetDelegation(delegatorAddr.String(), valAddr)
+	delegationResp, err := stakingClient.Delegation(nw.GetContext(), &stakingtypes.QueryDelegationRequest{
+		DelegatorAddr: delegatorAddr.String(),
+		ValidatorAddr: valAddr,
+	})
 	require.NoError(t, err, "failed to get delegation")
 	require.NotNil(t, delegationResp.DelegationResponse, "delegation should exist")
 	t.Logf("Delegation balance: %s", delegationResp.DelegationResponse.Balance)
@@ -120,7 +130,7 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 		sdk.NewCoins(sdk.NewCoin(baseDenom, transferAmount)),
 	)
 
-	txRes, err := txFactory.ExecuteCosmosTx(senderPrivKey, factory.CosmosTxArgs{
+	txRes, err = txFactory.ExecuteCosmosTx(senderPrivKey, commonfactory.CosmosTxArgs{
 		Msgs: []sdk.Msg{sendMsg},
 	})
 	require.NoError(t, err, "transfer should succeed")
@@ -151,16 +161,16 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 			smallAmount := sdkmath.NewInt(100_000_000_000_000_000) // 0.1 xcoin
 			sendMsg := banktypes.NewMsgSend(
 				senderAddr,
-				operatorAddr,
+				delegatorAddr,
 				sdk.NewCoins(sdk.NewCoin(baseDenom, smallAmount)),
 			)
 
-			txRes, err := txFactory.ExecuteCosmosTx(senderPrivKey, factory.CosmosTxArgs{
+			txRes, err := txFactory.ExecuteCosmosTx(senderPrivKey, commonfactory.CosmosTxArgs{
 				Msgs: []sdk.Msg{sendMsg},
 			})
 			require.NoError(t, err, fmt.Sprintf("transfer in block %d should succeed", i))
 			require.Equal(t, uint32(0), txRes.Code, fmt.Sprintf("transaction in block %d should succeed", i))
-			t.Logf("Block %d: Sent %s %s from sender to operator", i, smallAmount, baseDenom)
+			t.Logf("Block %d: Sent %s %s from sender to delegator", i, smallAmount, baseDenom)
 		}
 
 		// Log block height
@@ -170,28 +180,28 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 
 	// Verify EVM denomination
 	t.Log("\n=== Verifying EVM Denomination ===")
-	evmDenom := evmtypes.GetEVMCoinDenom()
+	evmClient := nw.GetEvmClient()
+	evmParamsResp, err := evmClient.Params(nw.GetContext(), &evmtypes.QueryParamsRequest{})
+	require.NoError(t, err, "failed to get EVM params")
+	evmDenom := evmParamsResp.Params.EvmDenom
 	t.Logf("EVM coin denom: %s", evmDenom)
 	require.Equal(t, baseDenom, evmDenom, "EVM denom should match base denom")
 
 	// Final balance check
 	t.Log("\n=== Final Balance Verification ===")
-	finalOperatorBalance, err := handler.GetBalance(operatorAddr, baseDenom)
-	require.NoError(t, err, "failed to get final operator balance")
 	finalDelegatorBalance, err := handler.GetBalance(delegatorAddr, baseDenom)
 	require.NoError(t, err, "failed to get final delegator balance")
 	finalSenderBalance, err := handler.GetBalance(senderAddr, baseDenom)
 	require.NoError(t, err, "failed to get final sender balance")
 
-	t.Logf("Final operator balance: %s %s", finalOperatorBalance.Balance.Amount, baseDenom)
 	t.Logf("Final delegator balance: %s %s", finalDelegatorBalance.Balance.Amount, baseDenom)
 	t.Logf("Final sender balance: %s %s", finalSenderBalance.Balance.Amount, baseDenom)
 
 	// Verify staking params use correct denom
-	stakingParams, err := handler.GetStakingParams()
+	stakingParamsResp, err := stakingClient.Params(nw.GetContext(), &stakingtypes.QueryParamsRequest{})
 	require.NoError(t, err, "failed to get staking params")
-	require.Equal(t, baseDenom, stakingParams.Params.BondDenom, "Staking bond denom should be txcoin")
-	t.Logf("Staking bond denom: %s", stakingParams.Params.BondDenom)
+	require.Equal(t, baseDenom, stakingParamsResp.Params.BondDenom, "Staking bond denom should be txcoin")
+	t.Logf("Staking bond denom: %s", stakingParamsResp.Params.BondDenom)
 
 	t.Log("\n=== Test Completed Successfully ===")
 	t.Log("✓ Base denomination: txcoin")
