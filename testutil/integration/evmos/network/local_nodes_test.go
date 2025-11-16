@@ -11,14 +11,17 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	cmdcfg "github.com/evmos/evmos/v19/cmd/config"
+	"github.com/evmos/evmos/v19/contracts"
 	commonfactory "github.com/evmos/evmos/v19/testutil/integration/common/factory"
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/factory"
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/grpc"
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/keyring"
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/network"
+	"github.com/evmos/evmos/v19/testutil/integration/evmos/utils"
 	evmostypes "github.com/evmos/evmos/v19/types"
 	evmtypes "github.com/evmos/evmos/v19/x/evm/types"
 )
@@ -237,4 +240,199 @@ func isXCoinAddress(addr string) bool {
 // isXCoinValidatorAddress checks if a validator address starts with xcoinvaloper1
 func isXCoinValidatorAddress(addr string) bool {
 	return len(addr) >= 13 && addr[:13] == "xcoinvaloper1"
+}
+
+// TestDeployFiveERC20Tokens tests deploying 5 ERC20 tokens as EVM contracts
+func TestDeployFiveERC20Tokens(t *testing.T) {
+	// Set Bech32 prefixes before creating network
+	config := sdk.GetConfig()
+	cmdcfg.SetBech32Prefixes(config)
+
+	// Initialize keyring with 2 accounts
+	keyring := keyring.New(2)
+	deployerAddr := keyring.GetAccAddr(0)
+	deployerPrivKey := keyring.GetPrivKey(0)
+	userAddr := keyring.GetAccAddr(1)
+	userPrivKey := keyring.GetPrivKey(1)
+
+	// Create network with txcoin denomination
+	// Configure EVM params to use txcoin as the EVM denomination
+	evmGenesis := evmtypes.DefaultGenesisState()
+	evmGenesis.Params.EvmDenom = evmostypes.AttoEvmos // Set EVM denom to txcoin
+
+	nw := network.New(
+		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
+		network.WithDenom(evmostypes.AttoEvmos), // Use txcoin as the base denomination
+		network.WithCustomGenesis(network.CustomGenesisState{
+			evmtypes.ModuleName: evmGenesis,
+		}),
+	)
+
+	// Create handlers for queries and transactions
+	handler := grpc.NewIntegrationHandler(nw)
+	txFactory := factory.New(nw, handler)
+
+	t.Log("\n=== Testing ERC20 Token Deployment ===")
+
+	// Define 5 different ERC20 tokens to deploy
+	type tokenInfo struct {
+		name     string
+		symbol   string
+		decimals uint8
+	}
+
+	tokens := []tokenInfo{
+		{"Bitcoin Wrapped", "WBTC", 8},
+		{"Ethereum Wrapped", "WETH", 18},
+		{"USD Coin", "USDC", 6},
+		{"Tether USD", "USDT", 6},
+		{"Dai Stablecoin", "DAI", 18},
+	}
+
+	// Import contracts package for ERC20 contract
+	var deployedContracts []struct {
+		address common.Address
+		token   tokenInfo
+	}
+
+	// Deploy each token
+	for i, token := range tokens {
+		t.Logf("\n--- Deploying Token %d/%d: %s (%s) ---", i+1, len(tokens), token.name, token.symbol)
+
+		// Deploy the contract
+		contractAddr, err := txFactory.DeployContract(
+			deployerPrivKey,
+			evmtypes.EvmTxArgs{},
+			factory.ContractDeploymentData{
+				Contract:        contracts.ERC20MinterBurnerDecimalsContract,
+				ConstructorArgs: []interface{}{token.name, token.symbol, token.decimals},
+			},
+		)
+		require.NoError(t, err, "failed to deploy %s contract", token.symbol)
+		t.Logf("✓ Contract deployed at: %s", contractAddr.Hex())
+
+		// Store deployed contract info
+		deployedContracts = append(deployedContracts, struct {
+			address common.Address
+			token   tokenInfo
+		}{contractAddr, token})
+
+		// Advance block to finalize deployment
+		err = nw.NextBlock()
+		require.NoError(t, err, "failed to advance block after deployment")
+	}
+
+	t.Log("\n=== Testing ERC20 Token Functionality ===")
+
+	// Test each deployed token
+	for i, deployed := range deployedContracts {
+		t.Logf("\n--- Testing Token %d/%d: %s (%s) at %s ---",
+			i+1, len(deployedContracts), deployed.token.name, deployed.token.symbol, deployed.address.Hex())
+
+		// 1. Check initial balance (should be 0)
+		balance, err := utils.GetERC20Balance(nw, deployed.address, deployerAddr)
+		require.NoError(t, err, "failed to get deployer balance for %s", deployed.token.symbol)
+		require.Equal(t, sdkmath.ZeroInt(), balance, "deployer should have zero initial balance")
+		t.Logf("✓ Initial deployer balance: %s %s", balance.String(), deployed.token.symbol)
+
+		// 2. Mint tokens to deployer
+		mintAmount := sdkmath.NewInt(1_000_000).MulRaw(int64(1) << deployed.token.decimals) // 1M tokens
+		_, err = txFactory.ExecuteContractCall(
+			deployerPrivKey,
+			evmtypes.EvmTxArgs{
+				To: &deployed.address,
+			},
+			factory.CallArgs{
+				ContractABI: contracts.ERC20MinterBurnerDecimalsContract.ABI,
+				MethodName:  "mint",
+				Args:        []interface{}{deployerAddr, mintAmount.BigInt()},
+			},
+		)
+		require.NoError(t, err, "failed to mint %s tokens", deployed.token.symbol)
+		t.Logf("✓ Minted %s tokens to deployer", mintAmount.String())
+
+		// Advance block
+		err = nw.NextBlock()
+		require.NoError(t, err, "failed to advance block after minting")
+
+		// 3. Check balance after minting
+		balance, err = utils.GetERC20Balance(nw, deployed.address, deployerAddr)
+		require.NoError(t, err, "failed to get deployer balance after minting")
+		require.Equal(t, mintAmount, balance, "deployer should have minted amount")
+		t.Logf("✓ Deployer balance after mint: %s %s", balance.String(), deployed.token.symbol)
+
+		// 4. Transfer tokens to user
+		transferAmount := sdkmath.NewInt(100_000).MulRaw(int64(1) << deployed.token.decimals) // 100k tokens
+		_, err = txFactory.ExecuteContractCall(
+			deployerPrivKey,
+			evmtypes.EvmTxArgs{
+				To: &deployed.address,
+			},
+			factory.CallArgs{
+				ContractABI: contracts.ERC20MinterBurnerDecimalsContract.ABI,
+				MethodName:  "transfer",
+				Args:        []interface{}{userAddr, transferAmount.BigInt()},
+			},
+		)
+		require.NoError(t, err, "failed to transfer %s tokens", deployed.token.symbol)
+		t.Logf("✓ Transferred %s tokens to user", transferAmount.String())
+
+		// Advance block
+		err = nw.NextBlock()
+		require.NoError(t, err, "failed to advance block after transfer")
+
+		// 5. Check user balance
+		userBalance, err := utils.GetERC20Balance(nw, deployed.address, userAddr)
+		require.NoError(t, err, "failed to get user balance")
+		require.Equal(t, transferAmount, userBalance, "user should have transferred amount")
+		t.Logf("✓ User balance: %s %s", userBalance.String(), deployed.token.symbol)
+
+		// 6. Check deployer balance after transfer
+		deployerBalance, err := utils.GetERC20Balance(nw, deployed.address, deployerAddr)
+		require.NoError(t, err, "failed to get deployer balance after transfer")
+		expectedBalance := mintAmount.Sub(transferAmount)
+		require.Equal(t, expectedBalance, deployerBalance, "deployer balance should be reduced by transfer amount")
+		t.Logf("✓ Deployer balance after transfer: %s %s", deployerBalance.String(), deployed.token.symbol)
+
+		// 7. User transfers back to deployer
+		transferBack := sdkmath.NewInt(10_000).MulRaw(int64(1) << deployed.token.decimals) // 10k tokens
+		_, err = txFactory.ExecuteContractCall(
+			userPrivKey,
+			evmtypes.EvmTxArgs{
+				To: &deployed.address,
+			},
+			factory.CallArgs{
+				ContractABI: contracts.ERC20MinterBurnerDecimalsContract.ABI,
+				MethodName:  "transfer",
+				Args:        []interface{}{deployerAddr, transferBack.BigInt()},
+			},
+		)
+		require.NoError(t, err, "failed to transfer %s tokens back", deployed.token.symbol)
+		t.Logf("✓ User transferred %s tokens back to deployer", transferBack.String())
+
+		// Advance block
+		err = nw.NextBlock()
+		require.NoError(t, err, "failed to advance block after transfer back")
+
+		// 8. Verify final balances
+		finalUserBalance, err := utils.GetERC20Balance(nw, deployed.address, userAddr)
+		require.NoError(t, err, "failed to get final user balance")
+		expectedUserBalance := transferAmount.Sub(transferBack)
+		require.Equal(t, expectedUserBalance, finalUserBalance, "user balance should be reduced by transfer back")
+		t.Logf("✓ Final user balance: %s %s", finalUserBalance.String(), deployed.token.symbol)
+
+		finalDeployerBalance, err := utils.GetERC20Balance(nw, deployed.address, deployerAddr)
+		require.NoError(t, err, "failed to get final deployer balance")
+		expectedFinalDeployerBalance := expectedBalance.Add(transferBack)
+		require.Equal(t, expectedFinalDeployerBalance, finalDeployerBalance, "deployer balance should increase by transfer back")
+		t.Logf("✓ Final deployer balance: %s %s", finalDeployerBalance.String(), deployed.token.symbol)
+	}
+
+	t.Log("\n=== All Tests Completed Successfully ===")
+	t.Logf("✓ Deployed %d ERC20 tokens", len(deployedContracts))
+	t.Log("✓ All tokens tested for:")
+	t.Log("  - Deployment")
+	t.Log("  - Minting")
+	t.Log("  - Transfers")
+	t.Log("  - Balance queries")
 }
