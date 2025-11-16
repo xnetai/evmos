@@ -105,6 +105,9 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 		Msgs: []sdk.Msg{delegateMsg},
 	})
 	require.NoError(t, err, "delegation should succeed")
+	if txRes.Code != 0 {
+		t.Logf("Delegation failed with code %d: %s", txRes.Code, txRes.RawLog)
+	}
 	require.Equal(t, uint32(0), txRes.Code, "delegation transaction should succeed")
 
 	// Commit the block to process the delegation
