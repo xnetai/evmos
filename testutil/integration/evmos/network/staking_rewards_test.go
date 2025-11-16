@@ -183,7 +183,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 
 	// Run 4 blocks with bank sends to different validators
 	t.Log("\n=== Running 4 Blocks with Transactions ===")
-	sendAmount := sdkmath.NewInt(1e18) // 1 xcoin per block (10^18 txcoin)
+	sendAmount := sdkmath.NewInt(5e17) // 0.5 xcoin per block (5*10^17 txcoin)
 	distrClient := nw.GetDistributionClient()
 
 	for blockNum := 0; blockNum < 4; blockNum++ {
@@ -371,7 +371,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	t.Log("✓ Configured inflation for staking rewards (90%) and community pool (10%)")
 	t.Log("✓ Configured target block rewards: ~100 xcoin per block")
 	t.Log("✓ Verified epoch configuration: 1 block per epoch")
-	t.Log("✓ Ran 4 blocks with 1 xcoin transactions to different validators")
+	t.Log("✓ Ran 4 blocks with 0.5 xcoin transactions to different validators")
 	t.Log("✓ Verified validator operator balances before each block")
 	t.Log("✓ Verified community pool increased by ~10% of block rewards")
 	t.Log("✓ Claimed rewards for all delegators after each block")
