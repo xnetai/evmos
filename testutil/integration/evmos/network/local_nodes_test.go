@@ -109,7 +109,7 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 	})
 	require.NoError(t, err, "delegation should succeed")
 	if txRes.Code != 0 {
-		t.Logf("Delegation failed with code %d: %s", txRes.Code, txRes.RawLog)
+		t.Logf("Delegation failed with code %d: %s", txRes.Code, txRes.Log)
 	}
 	require.Equal(t, uint32(0), txRes.Code, "delegation transaction should succeed")
 
