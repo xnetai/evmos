@@ -95,9 +95,12 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 	t.Logf("Delegating %s %s to validator %s", delegationAmount, baseDenom, valAddr)
 
 	// Create delegation message
+	valOperatorAddr, err := sdk.ValAddressFromBech32(valAddr)
+	require.NoError(t, err, "failed to parse validator address")
+
 	delegateMsg := stakingtypes.NewMsgDelegate(
 		delegatorAddr,
-		sdk.ValAddress(validator.GetOperator()),
+		valOperatorAddr,
 		sdk.NewCoin(baseDenom, delegationAmount),
 	)
 
