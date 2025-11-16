@@ -38,9 +38,16 @@ func TestLocalNodesWithTxCoinDenom(t *testing.T) {
 	senderPrivKey := keyring.GetPrivKey(1)
 
 	// Create network with txcoin denomination
+	// Configure EVM params to use txcoin as the EVM denomination
+	evmGenesis := evmtypes.DefaultGenesisState()
+	evmGenesis.Params.EvmDenom = evmostypes.AttoEvmos // Set EVM denom to txcoin
+
 	nw := network.New(
 		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
 		network.WithDenom(evmostypes.AttoEvmos), // Use txcoin as the base denomination
+		network.WithCustomGenesis(network.CustomGenesisState{
+			evmtypes.ModuleName: evmGenesis,
+		}),
 	)
 
 	// Create handlers for queries and transactions
