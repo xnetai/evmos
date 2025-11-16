@@ -5,6 +5,7 @@ package network_test
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
@@ -332,11 +333,11 @@ func TestDeployFiveERC20Tokens(t *testing.T) {
 		// 1. Check initial balance (should be 0)
 		balance, err := utils.GetERC20Balance(nw, deployed.address, deployerAddr)
 		require.NoError(t, err, "failed to get deployer balance for %s", deployed.token.symbol)
-		require.Equal(t, sdkmath.ZeroInt(), balance, "deployer should have zero initial balance")
+		require.Equal(t, common.Big0.Int64(), balance.Int64(), "deployer should have zero initial balance")
 		t.Logf("✓ Initial deployer balance: %s %s", balance.String(), deployed.token.symbol)
 
 		// 2. Mint tokens to deployer
-		mintAmount := sdkmath.NewInt(1_000_000).MulRaw(int64(1) << deployed.token.decimals) // 1M tokens
+		mintAmount := new(big.Int).Mul(big.NewInt(1_000_000), new(big.Int).Lsh(big.NewInt(1), uint(deployed.token.decimals))) // 1M tokens
 		_, err = txFactory.ExecuteContractCall(
 			deployerPrivKey,
 			evmtypes.EvmTxArgs{
@@ -345,7 +346,7 @@ func TestDeployFiveERC20Tokens(t *testing.T) {
 			factory.CallArgs{
 				ContractABI: contracts.ERC20MinterBurnerDecimalsContract.ABI,
 				MethodName:  "mint",
-				Args:        []interface{}{deployerAddr, mintAmount.BigInt()},
+				Args:        []interface{}{deployerAddr, mintAmount},
 			},
 		)
 		require.NoError(t, err, "failed to mint %s tokens", deployed.token.symbol)
@@ -358,11 +359,11 @@ func TestDeployFiveERC20Tokens(t *testing.T) {
 		// 3. Check balance after minting
 		balance, err = utils.GetERC20Balance(nw, deployed.address, deployerAddr)
 		require.NoError(t, err, "failed to get deployer balance after minting")
-		require.Equal(t, mintAmount, balance, "deployer should have minted amount")
+		require.Equal(t, mintAmount.String(), balance.String(), "deployer should have minted amount")
 		t.Logf("✓ Deployer balance after mint: %s %s", balance.String(), deployed.token.symbol)
 
 		// 4. Transfer tokens to user
-		transferAmount := sdkmath.NewInt(100_000).MulRaw(int64(1) << deployed.token.decimals) // 100k tokens
+		transferAmount := new(big.Int).Mul(big.NewInt(100_000), new(big.Int).Lsh(big.NewInt(1), uint(deployed.token.decimals))) // 100k tokens
 		_, err = txFactory.ExecuteContractCall(
 			deployerPrivKey,
 			evmtypes.EvmTxArgs{
@@ -371,7 +372,7 @@ func TestDeployFiveERC20Tokens(t *testing.T) {
 			factory.CallArgs{
 				ContractABI: contracts.ERC20MinterBurnerDecimalsContract.ABI,
 				MethodName:  "transfer",
-				Args:        []interface{}{userAddr, transferAmount.BigInt()},
+				Args:        []interface{}{userAddr, transferAmount},
 			},
 		)
 		require.NoError(t, err, "failed to transfer %s tokens", deployed.token.symbol)
@@ -384,18 +385,18 @@ func TestDeployFiveERC20Tokens(t *testing.T) {
 		// 5. Check user balance
 		userBalance, err := utils.GetERC20Balance(nw, deployed.address, userAddr)
 		require.NoError(t, err, "failed to get user balance")
-		require.Equal(t, transferAmount, userBalance, "user should have transferred amount")
+		require.Equal(t, transferAmount.String(), userBalance.String(), "user should have transferred amount")
 		t.Logf("✓ User balance: %s %s", userBalance.String(), deployed.token.symbol)
 
 		// 6. Check deployer balance after transfer
 		deployerBalance, err := utils.GetERC20Balance(nw, deployed.address, deployerAddr)
 		require.NoError(t, err, "failed to get deployer balance after transfer")
-		expectedBalance := mintAmount.Sub(transferAmount)
-		require.Equal(t, expectedBalance, deployerBalance, "deployer balance should be reduced by transfer amount")
+		expectedBalance := new(big.Int).Sub(mintAmount, transferAmount)
+		require.Equal(t, expectedBalance.String(), deployerBalance.String(), "deployer balance should be reduced by transfer amount")
 		t.Logf("✓ Deployer balance after transfer: %s %s", deployerBalance.String(), deployed.token.symbol)
 
 		// 7. User transfers back to deployer
-		transferBack := sdkmath.NewInt(10_000).MulRaw(int64(1) << deployed.token.decimals) // 10k tokens
+		transferBack := new(big.Int).Mul(big.NewInt(10_000), new(big.Int).Lsh(big.NewInt(1), uint(deployed.token.decimals))) // 10k tokens
 		_, err = txFactory.ExecuteContractCall(
 			userPrivKey,
 			evmtypes.EvmTxArgs{
@@ -404,7 +405,7 @@ func TestDeployFiveERC20Tokens(t *testing.T) {
 			factory.CallArgs{
 				ContractABI: contracts.ERC20MinterBurnerDecimalsContract.ABI,
 				MethodName:  "transfer",
-				Args:        []interface{}{deployerAddr, transferBack.BigInt()},
+				Args:        []interface{}{deployerAddr, transferBack},
 			},
 		)
 		require.NoError(t, err, "failed to transfer %s tokens back", deployed.token.symbol)
@@ -417,14 +418,14 @@ func TestDeployFiveERC20Tokens(t *testing.T) {
 		// 8. Verify final balances
 		finalUserBalance, err := utils.GetERC20Balance(nw, deployed.address, userAddr)
 		require.NoError(t, err, "failed to get final user balance")
-		expectedUserBalance := transferAmount.Sub(transferBack)
-		require.Equal(t, expectedUserBalance, finalUserBalance, "user balance should be reduced by transfer back")
+		expectedUserBalance := new(big.Int).Sub(transferAmount, transferBack)
+		require.Equal(t, expectedUserBalance.String(), finalUserBalance.String(), "user balance should be reduced by transfer back")
 		t.Logf("✓ Final user balance: %s %s", finalUserBalance.String(), deployed.token.symbol)
 
 		finalDeployerBalance, err := utils.GetERC20Balance(nw, deployed.address, deployerAddr)
 		require.NoError(t, err, "failed to get final deployer balance")
-		expectedFinalDeployerBalance := expectedBalance.Add(transferBack)
-		require.Equal(t, expectedFinalDeployerBalance, finalDeployerBalance, "deployer balance should increase by transfer back")
+		expectedFinalDeployerBalance := new(big.Int).Add(expectedBalance, transferBack)
+		require.Equal(t, expectedFinalDeployerBalance.String(), finalDeployerBalance.String(), "deployer balance should increase by transfer back")
 		t.Logf("✓ Final deployer balance: %s %s", finalDeployerBalance.String(), deployed.token.symbol)
 	}
 
