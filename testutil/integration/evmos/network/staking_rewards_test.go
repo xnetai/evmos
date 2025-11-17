@@ -5,6 +5,7 @@ package network_test
 
 import (
 	"testing"
+	"time"
 
 	sdkmath "cosmossdk.io/math"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -21,6 +22,7 @@ import (
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/keyring"
 	"github.com/evmos/evmos/v19/testutil/integration/evmos/network"
 	evmostypes "github.com/evmos/evmos/v19/types"
+	epochstypes "github.com/evmos/evmos/v19/x/epochs/types"
 	evmtypes "github.com/evmos/evmos/v19/x/evm/types"
 	inflationtypes "github.com/evmos/evmos/v19/x/inflation/v1/types"
 )
@@ -81,6 +83,19 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	t.Logf("Epoch configuration: identifier=%s, epochs per period=%d",
 		inflationGenesis.EpochIdentifier, inflationGenesis.EpochsPerPeriod)
 
+	// Configure epochs module to add a "block" epoch that triggers every block
+	epochsGenesis := epochstypes.DefaultGenesisState()
+	blockEpoch := epochstypes.EpochInfo{
+		Identifier:              "block",
+		StartTime:               time.Time{},
+		Duration:                time.Nanosecond, // Very short duration to trigger on every block
+		CurrentEpoch:            0,
+		CurrentEpochStartHeight: 0,
+		CurrentEpochStartTime:   time.Time{},
+		EpochCountingStarted:    false,
+	}
+	epochsGenesis.Epochs = append(epochsGenesis.Epochs, blockEpoch)
+
 	// Configure EVM params to use txcoin
 	evmGenesis := evmtypes.DefaultGenesisState()
 	evmGenesis.Params.EvmDenom = baseDenom
@@ -93,6 +108,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		network.WithCustomGenesis(network.CustomGenesisState{
 			evmtypes.ModuleName:       evmGenesis,
 			inflationtypes.ModuleName: inflationGenesis,
+			epochstypes.ModuleName:    epochsGenesis,
 		}),
 	)
 
