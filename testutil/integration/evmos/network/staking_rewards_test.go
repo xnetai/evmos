@@ -70,12 +70,10 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	}
 	// Set exponential calculation parameters for block rewards
 	// Target: 100 xcoin per block = 100 * 10^18 txcoin per block
-	// With 3 epochs in genesis (week, day, block), the formula divides by 3
-	// So we need C = 300 * 10^18 txcoin = 300000000000000000000
 	inflationGenesis.Params.ExponentialCalculation = inflationtypes.ExponentialCalculation{
 		A:             sdkmath.LegacyNewDec(int64(10_000_000)),                     // Initial inflation amount
 		R:             sdkmath.LegacyNewDecWithPrec(0, 2),                          // No reduction (0%)
-		C:             sdkmath.LegacyMustNewDecFromStr("300000000000000000000"),   // 300 * 10^18 txcoin = 300 xcoin (divided by 3 epochs = 100 xcoin/block)
+		C:             sdkmath.LegacyMustNewDecFromStr("100000000000000000000"),   // 100 * 10^18 txcoin = 100 xcoin per block
 		BondingTarget: sdkmath.LegacyNewDecWithPrec(66, 2),                         // 66% bonding target
 		MaxVariance:   sdkmath.LegacyZeroDec(),                                     // No variance
 	}
@@ -85,8 +83,8 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	t.Logf("Epoch configuration: identifier=%s, epochs per period=%d",
 		inflationGenesis.EpochIdentifier, inflationGenesis.EpochsPerPeriod)
 
-	// Configure epochs module to add a "block" epoch that triggers every block
-	epochsGenesis := epochstypes.DefaultGenesisState()
+	// Configure epochs module with ONLY a "block" epoch that triggers every block
+	// Replace default epochs (week, day) with only the block epoch to avoid division by 3
 	blockEpoch := epochstypes.EpochInfo{
 		Identifier:              "block",
 		StartTime:               time.Time{},
@@ -96,7 +94,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		CurrentEpochStartTime:   time.Time{},
 		EpochCountingStarted:    false,
 	}
-	epochsGenesis.Epochs = append(epochsGenesis.Epochs, blockEpoch)
+	epochsGenesis := epochstypes.NewGenesisState([]epochstypes.EpochInfo{blockEpoch})
 
 	// Configure EVM params to use txcoin
 	evmGenesis := evmtypes.DefaultGenesisState()
