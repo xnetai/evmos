@@ -123,9 +123,16 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	require.NoError(t, err, "failed to query inflation params")
 	t.Logf("Inflation enabled: %v", inflationParams.Params.EnableInflation)
 	t.Logf("Mint denom: %s", inflationParams.Params.MintDenom)
-	t.Logf("Inflation C parameter: %s (should be 100 * 10^18 = %s)",
-		inflationParams.Params.ExponentialCalculation.C,
-		sdkmath.LegacyNewDec(100).Mul(sdkmath.LegacyNewDec(1e18)))
+	t.Logf("Inflation C parameter: %s", inflationParams.Params.ExponentialCalculation.C)
+
+	// Query epochs to see what's actually configured
+	epochsClient := nw.GetEpochsClient()
+	epochsResp, err := epochsClient.EpochInfos(nw.GetContext(), &epochstypes.QueryEpochsInfoRequest{})
+	require.NoError(t, err, "failed to query epochs")
+	t.Logf("Number of epochs configured: %d", len(epochsResp.Epochs))
+	for i, epoch := range epochsResp.Epochs {
+		t.Logf("  Epoch %d: identifier=%s, duration=%s", i+1, epoch.Identifier, epoch.Duration)
+	}
 
 	inflationPeriod, err := inflationClient.Period(nw.GetContext(), &inflationtypes.QueryPeriodRequest{})
 	require.NoError(t, err, "failed to query inflation period")

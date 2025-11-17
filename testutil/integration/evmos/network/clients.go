@@ -15,6 +15,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/evmos/evmos/v19/app"
 	"github.com/evmos/evmos/v19/encoding"
+	epochstypes "github.com/evmos/evmos/v19/x/epochs/types"
 	erc20types "github.com/evmos/evmos/v19/x/erc20/types"
 	evmtypes "github.com/evmos/evmos/v19/x/evm/types"
 	feemarkettypes "github.com/evmos/evmos/v19/x/feemarket/types"
@@ -88,4 +89,10 @@ func (n *IntegrationNetwork) GetDistributionClient() distrtypes.QueryClient {
 	queryHelper := getQueryHelper(n.GetContext())
 	distrtypes.RegisterQueryServer(queryHelper, distributionkeeper.Querier{Keeper: n.app.DistrKeeper})
 	return distrtypes.NewQueryClient(queryHelper)
+}
+
+func (n *IntegrationNetwork) GetEpochsClient() epochstypes.QueryClient {
+	queryHelper := getQueryHelper(n.GetContext())
+	epochstypes.RegisterQueryServer(queryHelper, n.app.EpochsKeeper)
+	return epochstypes.NewQueryClient(queryHelper)
 }
