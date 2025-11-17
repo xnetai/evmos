@@ -69,13 +69,14 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		UsageIncentives: sdkmath.LegacyZeroDec(),               // Deprecated
 	}
 	// Set exponential calculation parameters for block rewards
-	// Simplified to produce consistent block rewards
+	// The inflation formula divides by epochs, so we need to adjust C accordingly
+	// Target: 100 xcoin per block, so C = 300 * 10^18 (gets divided by 3 epochs in default setup)
 	inflationGenesis.Params.ExponentialCalculation = inflationtypes.ExponentialCalculation{
-		A:             sdkmath.LegacyNewDec(int64(10_000_000)), // Initial inflation amount
-		R:             sdkmath.LegacyNewDecWithPrec(0, 2),      // No reduction (0%)
-		C:             sdkmath.LegacyNewDec(int64(100)).Mul(sdkmath.LegacyNewDec(1e18)), // Long-term inflation per block: 100 xcoin = 100 * 10^18 txcoin
-		BondingTarget: sdkmath.LegacyNewDecWithPrec(66, 2),    // 66% bonding target
-		MaxVariance:   sdkmath.LegacyZeroDec(),                 // No variance
+		A:             sdkmath.LegacyNewDec(int64(10_000_000)),                            // Initial inflation amount
+		R:             sdkmath.LegacyNewDecWithPrec(0, 2),                                 // No reduction (0%)
+		C:             sdkmath.LegacyNewDec(int64(300)).Mul(sdkmath.LegacyNewDec(1e18)), // 300 * 10^18 to get 100 xcoin per block
+		BondingTarget: sdkmath.LegacyNewDecWithPrec(66, 2),                                // 66% bonding target
+		MaxVariance:   sdkmath.LegacyZeroDec(),                                            // No variance
 	}
 	inflationGenesis.EpochIdentifier = "block" // Mint every block
 	inflationGenesis.EpochsPerPeriod = 1       // 1 block per epoch
@@ -133,7 +134,13 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 
 	inflationEpochMintProvision, err := inflationClient.EpochMintProvision(nw.GetContext(), &inflationtypes.QueryEpochMintProvisionRequest{})
 	require.NoError(t, err, "failed to query epoch mint provision")
-	t.Logf("Epoch mint provision: %s %s", toXCoin(inflationEpochMintProvision.EpochMintProvision.Amount.TruncateInt()), displayDenom)
+	epochMintAmount := inflationEpochMintProvision.EpochMintProvision.Amount.TruncateInt()
+	t.Logf("Epoch mint provision: %s %s", toXCoin(epochMintAmount), displayDenom)
+
+	// VERIFY: Epoch mint provision should be exactly 100 xcoin
+	expectedEpochMint := sdkmath.NewInt(100).Mul(sdkmath.NewInt(1e18)) // 100 xcoin in txcoin
+	require.Equal(t, expectedEpochMint, epochMintAmount,
+		"Epoch mint provision should be exactly 100 xcoin, got %s xcoin", toXCoin(epochMintAmount))
 
 	// Get validators
 	stakingClient := nw.GetStakingClient()
@@ -288,6 +295,12 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		t.Logf("Total supply AFTER block: %s %s (increased by %s %s)",
 			toXCoin(supplyAfter.Amount.Amount), displayDenom, toXCoin(supplyIncrease), displayDenom)
 
+		// VERIFY: Exactly 100 xcoin should be minted per block
+		expectedMintAmount := sdkmath.NewInt(100).Mul(sdkmath.NewInt(1e18)) // 100 xcoin in txcoin
+		require.Equal(t, expectedMintAmount, supplyIncrease,
+			"Block %d: supply should increase by exactly 100 xcoin, got %s xcoin",
+			blockNum+1, toXCoin(supplyIncrease))
+
 		// Verify community pool increased AFTER block
 		t.Log("\nVerifying block rewards distribution:")
 		communityPoolAfterBlock := sdkmath.ZeroInt()
@@ -300,8 +313,13 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 			}
 		}
 		communityPoolIncrease := communityPoolAfterBlock.Sub(communityPoolBefore)
-		t.Logf("Community pool increased by: %s %s (expected ~10%% of block rewards)",
-			toXCoin(communityPoolIncrease), displayDenom)
+		t.Logf("Community pool increased by: %s %s", toXCoin(communityPoolIncrease), displayDenom)
+
+		// VERIFY: Exactly 10 xcoin should go to community pool (10% of 100 xcoin)
+		expectedCommunityPoolIncrease := sdkmath.NewInt(10).Mul(sdkmath.NewInt(1e18)) // 10 xcoin in txcoin
+		require.Equal(t, expectedCommunityPoolIncrease, communityPoolIncrease,
+			"Block %d: community pool should increase by exactly 10 xcoin (10%% of rewards), got %s xcoin",
+			blockNum+1, toXCoin(communityPoolIncrease))
 
 		// First, check validator commission
 		t.Log("\nValidator commission:")
