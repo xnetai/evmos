@@ -69,14 +69,15 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		UsageIncentives: sdkmath.LegacyZeroDec(),               // Deprecated
 	}
 	// Set exponential calculation parameters for block rewards
-	// The inflation formula divides by epochs, so we need to adjust C accordingly
-	// Target: 100 xcoin per block, so C = 300 * 10^18 (gets divided by 3 epochs in default setup)
+	// Target: 100 xcoin per block = 100 * 10^18 txcoin per block
+	// With 3 epochs in genesis (week, day, block), the formula divides by 3
+	// So we need C = 300 * 10^18 txcoin = 300000000000000000000
 	inflationGenesis.Params.ExponentialCalculation = inflationtypes.ExponentialCalculation{
-		A:             sdkmath.LegacyNewDec(int64(10_000_000)),                            // Initial inflation amount
-		R:             sdkmath.LegacyNewDecWithPrec(0, 2),                                 // No reduction (0%)
-		C:             sdkmath.LegacyNewDec(int64(300)).Mul(sdkmath.LegacyNewDec(1e18)), // 300 * 10^18 to get 100 xcoin per block
-		BondingTarget: sdkmath.LegacyNewDecWithPrec(66, 2),                                // 66% bonding target
-		MaxVariance:   sdkmath.LegacyZeroDec(),                                            // No variance
+		A:             sdkmath.LegacyNewDec(int64(10_000_000)),                     // Initial inflation amount
+		R:             sdkmath.LegacyNewDecWithPrec(0, 2),                          // No reduction (0%)
+		C:             sdkmath.LegacyMustNewDecFromStr("300000000000000000000"),   // 300 * 10^18 txcoin = 300 xcoin (divided by 3 epochs = 100 xcoin/block)
+		BondingTarget: sdkmath.LegacyNewDecWithPrec(66, 2),                         // 66% bonding target
+		MaxVariance:   sdkmath.LegacyZeroDec(),                                     // No variance
 	}
 	inflationGenesis.EpochIdentifier = "block" // Mint every block
 	inflationGenesis.EpochsPerPeriod = 1       // 1 block per epoch
