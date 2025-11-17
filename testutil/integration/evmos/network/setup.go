@@ -271,11 +271,12 @@ func genStateSetter[T proto.Message](moduleName string) genSetupFn {
 // genesisSetupFunctions contains the available genesis setup functions
 // that can be used to customize the network genesis
 var genesisSetupFunctions = map[string]genSetupFn{
-	authtypes.ModuleName:  genStateSetter[*authtypes.GenesisState](authtypes.ModuleName),
-	evmtypes.ModuleName:   genStateSetter[*evmtypes.GenesisState](evmtypes.ModuleName),
-	govtypes.ModuleName:   genStateSetter[*govtypesv1.GenesisState](govtypes.ModuleName),
-	infltypes.ModuleName:  genStateSetter[*infltypes.GenesisState](infltypes.ModuleName),
-	erc20types.ModuleName: genStateSetter[*erc20types.GenesisState](erc20types.ModuleName),
+	authtypes.ModuleName:   genStateSetter[*authtypes.GenesisState](authtypes.ModuleName),
+	evmtypes.ModuleName:    genStateSetter[*evmtypes.GenesisState](evmtypes.ModuleName),
+	govtypes.ModuleName:    genStateSetter[*govtypesv1.GenesisState](govtypes.ModuleName),
+	infltypes.ModuleName:   genStateSetter[*infltypes.GenesisState](infltypes.ModuleName),
+	erc20types.ModuleName:  genStateSetter[*erc20types.GenesisState](erc20types.ModuleName),
+	epochstypes.ModuleName: genStateSetter[*epochstypes.GenesisState](epochstypes.ModuleName),
 }
 
 // setDefaultAuthGenesisState sets the default auth genesis state
