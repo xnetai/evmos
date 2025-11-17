@@ -100,6 +100,25 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	handler := grpc.NewIntegrationHandler(nw)
 	txFactory := factory.New(nw, handler)
 
+	// Verify inflation configuration
+	t.Log("\n=== Verifying Inflation Configuration ===")
+	inflationClient := nw.GetInflationClient()
+	inflationParams, err := inflationClient.Params(nw.GetContext(), &inflationtypes.QueryParamsRequest{})
+	require.NoError(t, err, "failed to query inflation params")
+	t.Logf("Inflation enabled: %v", inflationParams.Params.EnableInflation)
+	t.Logf("Mint denom: %s", inflationParams.Params.MintDenom)
+	t.Logf("Inflation C parameter: %s (should be 100 * 10^18 = %s)",
+		inflationParams.Params.ExponentialCalculation.C,
+		sdkmath.LegacyNewDec(100).Mul(sdkmath.LegacyNewDec(1e18)))
+
+	inflationPeriod, err := inflationClient.Period(nw.GetContext(), &inflationtypes.QueryPeriodRequest{})
+	require.NoError(t, err, "failed to query inflation period")
+	t.Logf("Current period: %d", inflationPeriod.Period)
+
+	inflationEpochMintProvision, err := inflationClient.EpochMintProvision(nw.GetContext(), &inflationtypes.QueryEpochMintProvisionRequest{})
+	require.NoError(t, err, "failed to query epoch mint provision")
+	t.Logf("Epoch mint provision: %s %s", toXCoin(inflationEpochMintProvision.EpochMintProvision.Amount.TruncateInt()), displayDenom)
+
 	// Get validators
 	stakingClient := nw.GetStakingClient()
 	validatorsResp, err := stakingClient.Validators(nw.GetContext(), &stakingtypes.QueryValidatorsRequest{
@@ -237,9 +256,21 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		t.Logf("Sent %s %s from Delegator %d to Validator %d",
 			toXCoin(sendAmount), displayDenom, blockNum+1, blockNum+1)
 
+		// Query total supply BEFORE committing block
+		supplyBefore, err := bankClient.SupplyOf(nw.GetContext(), &banktypes.QuerySupplyOfRequest{Denom: baseDenom})
+		require.NoError(t, err, "failed to query supply before block")
+		t.Logf("Total supply BEFORE block: %s %s", toXCoin(supplyBefore.Amount.Amount), displayDenom)
+
 		// Commit block
 		err = nw.NextBlock()
 		require.NoError(t, err, "failed to commit block %d", blockNum+1)
+
+		// Query total supply AFTER committing block
+		supplyAfter, err := bankClient.SupplyOf(nw.GetContext(), &banktypes.QuerySupplyOfRequest{Denom: baseDenom})
+		require.NoError(t, err, "failed to query supply after block")
+		supplyIncrease := supplyAfter.Amount.Amount.Sub(supplyBefore.Amount.Amount)
+		t.Logf("Total supply AFTER block: %s %s (increased by %s %s)",
+			toXCoin(supplyAfter.Amount.Amount), displayDenom, toXCoin(supplyIncrease), displayDenom)
 
 		// Verify community pool increased AFTER block
 		t.Log("\nVerifying block rewards distribution:")
