@@ -14,8 +14,14 @@ var (
 	//go:embed SimpleOrderbook.json
 	SimpleOrderbookJSON []byte
 
+	//go:embed EnhancedOrderbook.json
+	EnhancedOrderbookJSON []byte
+
 	// SimpleOrderbookContract is the compiled SimpleOrderbook contract
 	SimpleOrderbookContract evmtypes.CompiledContract
+
+	// EnhancedOrderbookContract is the compiled EnhancedOrderbook contract
+	EnhancedOrderbookContract evmtypes.CompiledContract
 )
 
 func init() {
@@ -23,6 +29,11 @@ func init() {
 
 	// Load SimpleOrderbook
 	if SimpleOrderbookContract, err = contractutils.ConvertHardhatBytesToCompiledContract(SimpleOrderbookJSON); err != nil {
+		panic(err)
+	}
+
+	// Load EnhancedOrderbook
+	if EnhancedOrderbookContract, err = contractutils.ConvertHardhatBytesToCompiledContract(EnhancedOrderbookJSON); err != nil {
 		panic(err)
 	}
 }
