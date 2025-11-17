@@ -71,7 +71,7 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 	inflationGenesis.Params.ExponentialCalculation = inflationtypes.ExponentialCalculation{
 		A:             sdkmath.LegacyNewDec(int64(10_000_000)), // Initial inflation amount
 		R:             sdkmath.LegacyNewDecWithPrec(0, 2),      // No reduction (0%)
-		C:             sdkmath.LegacyNewDec(int64(100)),        // Long-term inflation per block (~100 tokens)
+		C:             sdkmath.LegacyNewDec(int64(100)).Mul(sdkmath.LegacyNewDec(1e18)), // Long-term inflation per block: 100 xcoin = 100 * 10^18 txcoin
 		BondingTarget: sdkmath.LegacyNewDecWithPrec(66, 2),    // 66% bonding target
 		MaxVariance:   sdkmath.LegacyZeroDec(),                 // No variance
 	}
