@@ -256,8 +256,32 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 		t.Logf("Community pool increased by: %s %s (expected ~10%% of block rewards)",
 			toXCoin(communityPoolIncrease), displayDenom)
 
+		// First, check validator commission
+		t.Log("\nValidator commission:")
+		for i := 0; i < 4; i++ {
+			valAddr := validatorsResp.Validators[i].OperatorAddress
+
+			// Query validator commission
+			commissionResp, err := distrClient.ValidatorCommission(nw.GetContext(), &distrtypes.QueryValidatorCommissionRequest{
+				ValidatorAddress: valAddr,
+			})
+			require.NoError(t, err, "failed to query commission for validator %d", i+1)
+
+			if len(commissionResp.Commission.Commission) > 0 {
+				totalCommission := sdkmath.ZeroInt()
+				for _, coin := range commissionResp.Commission.Commission {
+					if coin.Denom == baseDenom {
+						totalCommission = totalCommission.Add(coin.Amount.TruncateInt())
+					}
+				}
+				t.Logf("  Validator %d commission: %s %s", i+1, toXCoin(totalCommission), displayDenom)
+			} else {
+				t.Logf("  Validator %d has no commission yet", i+1)
+			}
+		}
+
 		// Claim rewards for all delegators after each block
-		t.Log("Claiming rewards for all delegators:")
+		t.Log("\nClaiming delegator rewards:")
 		for i := 0; i < 4; i++ {
 			valAddr := validatorsResp.Validators[i].OperatorAddress
 			valOperatorAddr, _ := sdk.ValAddressFromBech32(valAddr)
@@ -278,6 +302,13 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 				}
 				t.Logf("  Delegator %d has %s %s rewards pending", i+1, toXCoin(totalRewards), displayDenom)
 
+				// Get balance before claiming
+				balanceBefore, err := bankClient.Balance(nw.GetContext(), &banktypes.QueryBalanceRequest{
+					Address: delegators[i].String(),
+					Denom:   baseDenom,
+				})
+				require.NoError(t, err, "failed to get balance before claiming")
+
 				// Claim rewards
 				withdrawMsg := distrtypes.NewMsgWithdrawDelegatorReward(
 					delegators[i],
@@ -288,7 +319,23 @@ func TestStakingRewardsWithInflation(t *testing.T) {
 					Msgs: []sdk.Msg{withdrawMsg},
 				})
 				if err == nil && txRes.Code == 0 {
-					t.Logf("  ✓ Delegator %d claimed rewards successfully", i+1)
+					// Get balance after claiming (before NextBlock)
+					balanceAfter, err := bankClient.Balance(nw.GetContext(), &banktypes.QueryBalanceRequest{
+						Address: delegators[i].String(),
+						Denom:   baseDenom,
+					})
+					require.NoError(t, err, "failed to get balance after claiming")
+
+					balanceIncrease := balanceAfter.Balance.Amount.Sub(balanceBefore.Balance.Amount)
+					t.Logf("  ✓ Delegator %d: balance increased by %s %s (from %s to %s)",
+						i+1, toXCoin(balanceIncrease), displayDenom,
+						toXCoin(balanceBefore.Balance.Amount), toXCoin(balanceAfter.Balance.Amount))
+				} else {
+					if err != nil {
+						t.Logf("  ✗ Delegator %d claim failed: %v", i+1, err)
+					} else {
+						t.Logf("  ✗ Delegator %d claim failed with code: %d", i+1, txRes.Code)
+					}
 				}
 			} else {
 				t.Logf("  Delegator %d has no rewards yet", i+1)
