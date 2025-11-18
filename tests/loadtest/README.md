@@ -1,14 +1,16 @@
 # Batch Trades Load Test
 
-This directory contains load tests for the BatchOrderBook smart contract, designed to test high-throughput trading scenarios on the Evmos blockchain.
+This directory contains comprehensive load tests for the BatchOrderBook smart contract, designed to test high-throughput trading scenarios on the Evmos blockchain with multi-node configurations.
 
 ## Overview
 
-The load test simulates a high-volume trading environment where:
-- 1000 trades are aggregated into a single batch
-- 3 batches are submitted per second
-- Statistics are tracked per block and per second
-- Node connectivity is verified using `netstat`/`ss` commands
+The load test suite simulates high-volume trading environments with:
+- **Basic Load Tests**: 1,000 trades per batch
+- **Large Batch Tests**: 20,000, 30,000, and 100,000 trades per batch
+- **Multi-Node Tests**: Testing with 3 and 10 validator nodes
+- **Node Synchronization**: Verification that all nodes remain in sync
+- **Performance Metrics**: Detailed throughput and timing statistics
+- **Node Verification**: Using `netstat`/`ss` commands to verify node connectivity
 
 ## Components
 
@@ -71,7 +73,39 @@ The Go test suite implements:
 - Throughput metrics (trades/sec, batches/sec)
 - Block-level statistics
 
-### 3. Contract Data
+### 3. Multi-Node Load Test Suite
+
+**Location**: `multinode_test.go`
+
+Tests batch trades with 3 validators:
+- **20k Trades Test**: 20,000 trades per batch, 3 batches/sec, 3 seconds
+- **30k Trades Test**: 30,000 trades per batch, 3 batches/sec, 3 seconds
+- **100k Trades Test**: 100,000 trades per batch, 3 batches/sec, 3 seconds
+
+**Features**:
+- Comprehensive node statistics at startup
+- Validator power and status display
+- Node synchronization verification
+- Per-block trade batch tracking
+- Detailed timing metrics (submission time, block time)
+
+### 4. Ten-Node Load Test Suite
+
+**Location**: `tennode_test.go`
+
+Tests batch trades with 10 validators:
+- **20k Trades Test**: 20,000 trades per batch with 10 nodes
+- **30k Trades Test**: 30,000 trades per batch with 10 nodes
+- **100k Trades Test**: 100,000 trades per batch with 10 nodes
+
+**Features**:
+- Detailed validator table with power, status, and jailed state
+- Consensus requirements calculation
+- All-node synchronization checks
+- Contract deployment verification across all nodes
+- Per-validator statistics tracking
+
+### 5. Contract Data
 
 **Location**: `contract_data.go`
 
@@ -113,16 +147,41 @@ go test -c ./tests/loadtest
 go test -v ./tests/loadtest
 ```
 
-### Run Specific Test
+### Run Basic Load Test (1,000 trades)
 
 ```bash
-go test -v ./tests/loadtest -run TestBatchTradesLoad
+go test -v ./tests/loadtest -run TestBatchTradesLoadTest
+```
+
+### Run Multi-Node Tests (3 validators)
+
+```bash
+# Run all multi-node tests (20k, 30k, 100k trades)
+go test -v ./tests/loadtest -run TestMultiNodeLoadTest
+
+# Run specific batch size
+go test -v ./tests/loadtest -run TestMultiNodeLoadTest/TestBatchSize20k
+go test -v ./tests/loadtest -run TestMultiNodeLoadTest/TestBatchSize30k
+go test -v ./tests/loadtest -run TestMultiNodeLoadTest/TestBatchSize100k
+```
+
+### Run Ten-Node Tests (10 validators)
+
+```bash
+# Run all ten-node tests (20k, 30k, 100k trades)
+go test -v ./tests/loadtest -run TestTenNodeLoadTest
+
+# Run specific batch size
+go test -v ./tests/loadtest -run TestTenNodeLoadTest/TestTenNodeBatchSize20k
+go test -v ./tests/loadtest -run TestTenNodeLoadTest/TestTenNodeBatchSize30k
+go test -v ./tests/loadtest -run TestTenNodeLoadTest/TestTenNodeBatchSize100k
 ```
 
 ### Run with Custom Parameters
 
-To modify test parameters, edit the constants in `batch_trades_test.go`:
+To modify test parameters, edit the constants in the respective test files:
 
+**`batch_trades_test.go`** (Basic test):
 ```go
 const (
     tradesPerBatch  = 1000  // Number of trades per batch
@@ -130,6 +189,11 @@ const (
     testDurationSec = 10    // Test duration in seconds
 )
 ```
+
+**`multinode_test.go`** and **`tennode_test.go`** (Multi-node tests):
+- Tests are parameterized by batch size (20k, 30k, 100k)
+- Fixed at 3 batches/sec, 3 seconds duration
+- Validator count set in SetupSuite (3 or 10 nodes)
 
 ## Test Output
 
@@ -183,6 +247,101 @@ The test provides detailed output including:
    Contract state verified successfully
    === Verification Complete ===
    ```
+
+### Multi-Node Test Output Examples
+
+**Node Statistics (10 Validators)**:
+```
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    Detailed Node Statistics & Verification                    ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+Network Configuration:
+  - Chain ID: evmos_9000-1
+  - Total Validators: 10
+  - Block Height: 1
+  - Block Time: 2025-11-18 12:00:00
+
+Validator Details:
+┌─────┬──────────────────────────────────────────────┬──────────┬────────────┬──────────┐
+│ ID  │ Validator Address                            │ Power    │ Status     │ Jailed   │
+├─────┼──────────────────────────────────────────────┼──────────┼────────────┼──────────┤
+│ 1   │ evmosvaloper1abc...                          │ 1000000  │ Bonded     │ No       │
+│ 2   │ evmosvaloper1def...                          │ 1000000  │ Bonded     │ No       │
+...
+└─────┴──────────────────────────────────────────────┴──────────┴────────────┴──────────┘
+
+Network Summary:
+  - Active Validators: 10 / 10
+  - Total Voting Power: 10000000
+  - Average Power per Validator: 1000000.00
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                  ✓ All 10 Nodes Verified and Synchronized                     ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+```
+
+**Progress with Timing** (Multi-node):
+```
+Sec 1 | Batches: 3 (60000 trades) | Submit:  125ms | Block: 1→2 ( 50ms) | ✓ 3 | ✗ 0 | Nodes: 10 synced
+Sec 2 | Batches: 3 (60000 trades) | Submit:  118ms | Block: 2→3 ( 48ms) | ✓ 6 | ✗ 0 | Nodes: 10 synced
+Sec 3 | Batches: 3 (60000 trades) | Submit:  122ms | Block: 3→4 ( 51ms) | ✓ 9 | ✗ 0 | Nodes: 10 synced
+```
+
+**Node Synchronization Verification**:
+```
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                 10-Node Synchronization Verification                          ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+Network State:
+  - Current Height: 4
+  - Block Time: 2025-11-18 12:00:03
+  - Total Validators: 10
+
+Per-Validator Synchronization:
+  ✓ Validator  1 synced at height 4 (Power: 1000000)
+  ✓ Validator  2 synced at height 4 (Power: 1000000)
+  ...
+  ✓ Validator 10 synced at height 4 (Power: 1000000)
+
+Block Processing Summary:
+  ✓ Block 2: 3 batches, all 10 nodes synced
+  ✓ Block 3: 3 batches, all 10 nodes synced
+  ✓ Block 4: 3 batches, all 10 nodes synced
+
+✓ All 10 nodes verified in sync with trade batches
+╚════════════════════════════════════════════════════════════════════════════════╝
+```
+
+**Final Statistics** (100k trades test):
+```
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                        10-Node Load Test Results                              ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+Test Duration: 3.125s
+
+Performance Metrics:
+  - Total Batches: 9
+  - Total Trades: 900000
+  - Success Rate: 100.00% (9/9)
+  - Failed Batches: 0
+
+Throughput Analysis:
+  - Batches/sec: 2.88
+  - Trades/sec: 288000.00
+  - Avg Batch Size: 100000 trades
+  - Blocks Produced: 3
+  - Avg Block Time: 1041.67 ms
+
+Network Statistics:
+  - Validators: 10
+  - All Nodes Synced: ✓ Yes
+  - Consensus Maintained: ✓ Yes
+
+╚════════════════════════════════════════════════════════════════════════════════╝
+```
 
 ## Architecture
 
