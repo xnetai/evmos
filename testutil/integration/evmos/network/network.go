@@ -25,6 +25,7 @@ import (
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	sdktestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -53,6 +54,9 @@ type Network interface {
 	GetInflationClient() infltypes.QueryClient
 	GetFeeMarketClient() feemarkettypes.QueryClient
 	GetVestingClient() vestingtypes.QueryClient
+
+	// Keepers
+	GetBankKeeper() bankkeeper.Keeper
 }
 
 var _ Network = (*IntegrationNetwork)(nil)
@@ -370,4 +374,10 @@ func (n *IntegrationNetwork) CheckTx(txBytes []byte) (*abcitypes.ResponseCheckTx
 		return nil, err
 	}
 	return res, nil
+}
+
+// GetBankKeeper returns the bank keeper for the network.
+// This allows direct access to bank operations like minting and transferring coins.
+func (n *IntegrationNetwork) GetBankKeeper() bankkeeper.Keeper {
+	return n.app.BankKeeper
 }
