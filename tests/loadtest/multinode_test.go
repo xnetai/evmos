@@ -197,6 +197,11 @@ func (s *MultiNodeLoadTestSuite) deployBatchOrderBookContract() {
 	require.NoError(s.T(), err)
 }
 
+// TestDefaultBatchLoad tests with default 30,000 trades per batch
+func (s *MultiNodeLoadTestSuite) TestDefaultBatchLoad() {
+	s.runBatchSizeTest(30000, "Default Batch Load (30,000 Trades)")
+}
+
 // TestBatchSize20k tests with 20,000 trades per batch
 func (s *MultiNodeLoadTestSuite) TestBatchSize20k() {
 	s.runBatchSizeTest(20000, "20,000 Trades per Batch")
@@ -221,8 +226,8 @@ func (s *MultiNodeLoadTestSuite) runBatchSizeTest(tradesPerBatch int, testName s
 	s.T().Logf("╚════════════════════════════════════════════════════════╝\n")
 
 	const (
-		batchesPerSec   = 3
-		testDurationSec = 3 // 3 seconds, 3 batches per second = 9 batches total
+		batchesPerBlock = 1  // 1 batch per block
+		numBlocks       = 9  // Number of blocks to test
 	)
 
 	// Statistics tracking
@@ -248,10 +253,10 @@ func (s *MultiNodeLoadTestSuite) runBatchSizeTest(tradesPerBatch int, testName s
 
 	s.T().Logf("Configuration:")
 	s.T().Logf("  - Trades per batch: %d", tradesPerBatch)
-	s.T().Logf("  - Batches per second: %d", batchesPerSec)
-	s.T().Logf("  - Test duration: %d seconds", testDurationSec)
-	s.T().Logf("  - Total batches: %d", batchesPerSec*testDurationSec)
-	s.T().Logf("  - Expected total trades: %d", tradesPerBatch*batchesPerSec*testDurationSec)
+	s.T().Logf("  - Batches per block: %d", batchesPerBlock)
+	s.T().Logf("  - Number of blocks: %d", numBlocks)
+	s.T().Logf("  - Total batches: %d", batchesPerBlock*numBlocks)
+	s.T().Logf("  - Expected total trades: %d", tradesPerBatch*batchesPerBlock*numBlocks)
 	s.T().Logf("  - Number of validators: %d", len(s.validatorInfo))
 	s.T().Log("")
 
@@ -260,7 +265,7 @@ func (s *MultiNodeLoadTestSuite) runBatchSizeTest(tradesPerBatch int, testName s
 	s.T().Logf("Starting block height: %d\n", startHeight)
 
 	// Run the load test
-	s.runMultiNodeLoadTest(ctx, tradesPerBatch, batchesPerSec, testDurationSec, stats)
+	s.runMultiNodeLoadTest(ctx, tradesPerBatch, batchesPerBlock, numBlocks, stats)
 
 	// Wait for pending transactions
 	s.T().Log("\nWaiting for pending transactions to be mined...")
@@ -287,78 +292,71 @@ func (s *MultiNodeLoadTestSuite) runBatchSizeTest(tradesPerBatch int, testName s
 func (s *MultiNodeLoadTestSuite) runMultiNodeLoadTest(
 	ctx context.Context,
 	tradesPerBatch int,
-	batchesPerSec int,
-	durationSec int,
+	batchesPerBlock int,
+	numBlocks int,
 	stats *MultiNodeLoadTestStats,
 ) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	timeout := time.After(time.Duration(durationSec) * time.Second)
 	submitterKey := s.keyring.GetKey(0)
 
-	secondCount := 0
+	s.T().Log("\nStarting block-based batch submission...")
 
-	for {
-		select {
-		case <-timeout:
-			s.T().Log("✓ Load test duration completed")
-			return
-		case <-ticker.C:
-			secondCount++
-			startTime := time.Now()
+	// Submit batches for each block
+	for blockNum := 0; blockNum < numBlocks; blockNum++ {
+		startTime := time.Now()
+		currentHeight := s.network.GetContext().BlockHeight()
 
-			// Submit batches for this second
-			var wg sync.WaitGroup
-			for i := 0; i < batchesPerSec; i++ {
-				wg.Add(1)
-				go func(batchNum int) {
-					defer wg.Done()
-					s.submitMultiNodeBatch(submitterKey, tradesPerBatch, stats)
-				}(i)
-			}
-			wg.Wait()
-
-			submissionTime := time.Since(startTime)
-
-			// Mine a block
-			blockStartTime := time.Now()
-			currentHeight := s.network.GetContext().BlockHeight()
-			err := s.network.NextBlock()
-			if err != nil {
-				s.T().Logf("⚠ Warning: failed to mine block: %v", err)
-			}
-			blockTime := time.Since(blockStartTime)
-			newHeight := s.network.GetContext().BlockHeight()
-
-			// Record block stats
-			stats.mutex.Lock()
-			if _, exists := stats.BlockStats[newHeight]; !exists {
-				stats.BlockStats[newHeight] = &BlockSyncStats{
-					Height:        newHeight,
-					BatchesInBlock: batchesPerSec,
-					Timestamp:     time.Now(),
-					AllNodesSynced: true,
-				}
-			}
-			stats.mutex.Unlock()
-
-			// Print progress with timing
-			stats.mutex.Lock()
-			s.T().Logf("Second %d: %d batches (%d trades) | Submission: %v | Block: %d→%d (%v) | Success: %d | Errors: %d",
-				secondCount,
-				batchesPerSec,
-				tradesPerBatch*batchesPerSec,
-				submissionTime.Round(time.Millisecond),
-				currentHeight,
-				newHeight,
-				blockTime.Round(time.Millisecond),
-				stats.SuccessCount,
-				stats.ErrorCount,
-			)
-			stats.mutex.Unlock()
+		// Submit batches for this block
+		var wg sync.WaitGroup
+		for i := 0; i < batchesPerBlock; i++ {
+			wg.Add(1)
+			go func(batchNum int) {
+				defer wg.Done()
+				s.submitMultiNodeBatch(submitterKey, tradesPerBatch, stats)
+			}(i)
 		}
+		wg.Wait()
+
+		submissionTime := time.Since(startTime)
+
+		// Mine a block
+		blockStartTime := time.Now()
+		err := s.network.NextBlock()
+		if err != nil {
+			s.T().Logf("⚠ Warning: failed to mine block: %v", err)
+		}
+		blockTime := time.Since(blockStartTime)
+		newHeight := s.network.GetContext().BlockHeight()
+
+		// Record block stats
+		stats.mutex.Lock()
+		if _, exists := stats.BlockStats[newHeight]; !exists {
+			stats.BlockStats[newHeight] = &BlockSyncStats{
+				Height:         newHeight,
+				BatchesInBlock: batchesPerBlock,
+				Timestamp:      time.Now(),
+				AllNodesSynced: true,
+			}
+		}
+		stats.mutex.Unlock()
+
+		// Print progress with timing
+		stats.mutex.Lock()
+		s.T().Logf("Block %d/%d: %d batches (%d trades) | Submission: %v | Block: %d→%d (%v) | Success: %d | Errors: %d",
+			blockNum+1,
+			numBlocks,
+			batchesPerBlock,
+			tradesPerBatch*batchesPerBlock,
+			submissionTime.Round(time.Millisecond),
+			currentHeight,
+			newHeight,
+			blockTime.Round(time.Millisecond),
+			stats.SuccessCount,
+			stats.ErrorCount,
+		)
+		stats.mutex.Unlock()
 	}
+
+	s.T().Log("✓ Load test completed")
 }
 
 // submitMultiNodeBatch submits a batch and tracks statistics
@@ -529,11 +527,11 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 		Args:        []interface{}{},
 	}
 
-	callerPrivKey := s.keyring.GetPrivKey(0)
+	callerKey := s.keyring.GetKey(0)
 
 	// Set explicit gas limit for the query (view functions still need gas)
 	res, _, err := s.factory.CallContractAndCheckLogs(
-		callerPrivKey,
+		callerKey.Priv,
 		evmtypes.EvmTxArgs{
 			To:       &s.contractAddr,
 			GasLimit: 5000000, // 5M gas for view function
