@@ -24,7 +24,8 @@ import (
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	"github.com/evmos/evmos/v20/utils"
+	"github.com/evmos/evmos/v20/testutil/integration/evmos/utils"
+	evmosutils "github.com/evmos/evmos/v20/utils"
 	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
 	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
 )
@@ -128,7 +129,7 @@ func (s *MultiNodeLoadTestSuite) SetupSuite() {
 	// Create the network with multiple validators
 	// Using TestingChainID (evmos_9002) which maps to txcoin as the base denom
 	s.network = network.New(
-		network.WithChainID(utils.TestingChainID+"-1"),
+		network.WithChainID(evmosutils.TestingChainID+"-1"),
 		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
 		network.WithAmountOfValidators(numValidators),
 		network.WithCustomGenesis(network.CustomGenesisState{
@@ -529,14 +530,9 @@ func (s *MultiNodeLoadTestSuite) queryTradesInBlock(blockHeight int64) int {
 		return 0
 	}
 
-	// Parse the result - it's a uint256
-	if len(res.Ret) == 0 {
-		return 0
-	}
-
 	// Decode the return value (uint256)
 	var tradesExecuted *big.Int
-	err = BatchOrderBookContract.ABI.UnpackIntoInterface(&tradesExecuted, "getTradesInBlock", res.Ret)
+	err = utils.DecodeContractCallResponse(&tradesExecuted, callArgs, res)
 	if err != nil {
 		return 0
 	}
