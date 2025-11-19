@@ -122,9 +122,12 @@ func (s *TenNodeLoadTestSuite) printDetailedNodeStatistics() {
 			activeValidators++
 		}
 
+		// In v19, OperatorAddress is a string field, convert to ValAddress
+		valAddr := sdktypes.ValAddress(val.OperatorAddress)
+
 		s.T().Logf("│ %-3d │ %-44s │ %-8d │ %-10s │ %-8s │",
 			i+1,
-			val.GetOperator().String(),
+			valAddr.String(),
 			power,
 			status,
 			jailed,
@@ -133,7 +136,7 @@ func (s *TenNodeLoadTestSuite) printDetailedNodeStatistics() {
 		// Store validator info
 		s.validatorInfo[i] = ValidatorInfo{
 			Index:         i,
-			Address:       val.GetOperator(),
+			Address:       valAddr,
 			Power:         power,
 			BlockHeight:   ctx.BlockHeight(),
 			LastBlockTime: ctx.BlockTime(),
@@ -185,18 +188,16 @@ func (s *TenNodeLoadTestSuite) printDetailedNodeStatistics() {
 
 // deployBatchOrderBookContract deploys the contract
 func (s *TenNodeLoadTestSuite) deployBatchOrderBookContract() {
-	deployerPrivKey := s.keyring.GetPrivKey(0)
-	deployerAddr := s.keyring.GetAddr(0)
+	deployerKey := s.keyring.GetKey(0)
 
 	contractData := factory.ContractDeploymentData{
 		Contract: BatchOrderBookContract,
 	}
 
+	// Note: From address is derived from privKey automatically in v19
 	contractAddr, err := s.factory.DeployContract(
-		deployerPrivKey,
-		evmtypes.EvmTxArgs{
-			From: deployerAddr,
-		},
+		deployerKey.Priv,
+		evmtypes.EvmTxArgs{},
 		contractData,
 	)
 	require.NoError(s.T(), err, "failed to deploy BatchOrderBook contract")
@@ -217,8 +218,9 @@ func (s *TenNodeLoadTestSuite) deployBatchOrderBookContract() {
 func (s *TenNodeLoadTestSuite) verifyContractDeployment() {
 	s.T().Log("\nVerifying contract deployment across all nodes:")
 
+	// Use ABI struct, not string
 	callArgs := factory.CallArgs{
-		ContractABI: BatchOrderBookABI,
+		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "getStats",
 		Args:        []interface{}{},
 	}
@@ -335,8 +337,7 @@ func (s *TenNodeLoadTestSuite) runTenNodeLoadTest(
 	defer ticker.Stop()
 
 	timeout := time.After(time.Duration(durationSec) * time.Second)
-	submitterPrivKey := s.keyring.GetPrivKey(0)
-	submitterAddr := s.keyring.GetAddr(0)
+	submitterKey := s.keyring.GetKey(0)
 
 	secondCount := 0
 
@@ -355,7 +356,7 @@ func (s *TenNodeLoadTestSuite) runTenNodeLoadTest(
 				wg.Add(1)
 				go func(batchNum int) {
 					defer wg.Done()
-					s.submitTenNodeBatch(submitterPrivKey, submitterAddr, tradesPerBatch, stats)
+					s.submitTenNodeBatch(submitterKey, tradesPerBatch, stats)
 				}(i)
 			}
 			wg.Wait()
@@ -403,21 +404,24 @@ func (s *TenNodeLoadTestSuite) runTenNodeLoadTest(
 
 // submitTenNodeBatch submits a batch
 func (s *TenNodeLoadTestSuite) submitTenNodeBatch(
-	privKey keyring.Key,
-	from common.Address,
+	key keyring.Key,
 	tradeCount int,
 	stats *MultiNodeLoadTestStats,
 ) {
+	// Generate mock trades
+	from := key.Addr
 	trades := s.generateMockTrades(from, tradeCount)
 
+	// Prepare the contract call - use ABI struct, not string
 	callArgs := factory.CallArgs{
-		ContractABI: BatchOrderBookABI,
+		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "executeBatchTrades",
 		Args:        []interface{}{trades},
 	}
 
+	// Execute the contract call
 	_, err := s.factory.ExecuteContractCall(
-		privKey,
+		key.Priv,
 		evmtypes.EvmTxArgs{
 			To: &s.contractAddr,
 		},
@@ -539,8 +543,9 @@ func (s *TenNodeLoadTestSuite) verifyTenNodeContractState(stats *MultiNodeLoadTe
 	s.T().Log("║              Contract State Verification (All 10 Nodes)                       ║")
 	s.T().Log("╚════════════════════════════════════════════════════════════════════════════════╝\n")
 
+	// Query the contract for stats - use ABI struct, not string
 	callArgs := factory.CallArgs{
-		ContractABI: BatchOrderBookABI,
+		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "getStats",
 		Args:        []interface{}{},
 	}

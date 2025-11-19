@@ -136,9 +136,12 @@ func (s *MultiNodeLoadTestSuite) printNodeStatistics() {
 			activeValidators++
 		}
 
+		// In v19, OperatorAddress is a string field, convert to ValAddress
+		valAddr := sdktypes.ValAddress(val.OperatorAddress)
+
 		s.T().Logf("│ %-3d │ %-44s │ %-8d │ %-10s │",
 			i+1,
-			val.GetOperator().String(),
+			valAddr.String(),
 			power,
 			status,
 		)
@@ -146,7 +149,7 @@ func (s *MultiNodeLoadTestSuite) printNodeStatistics() {
 		// Store validator info
 		s.validatorInfo[i] = ValidatorInfo{
 			Index:         i,
-			Address:       val.GetOperator(),
+			Address:       valAddr,
 			Power:         power,
 			BlockHeight:   ctx.BlockHeight(),
 			LastBlockTime: ctx.BlockTime(),
@@ -173,18 +176,16 @@ func (s *MultiNodeLoadTestSuite) printNodeStatistics() {
 
 // deployBatchOrderBookContract deploys the contract
 func (s *MultiNodeLoadTestSuite) deployBatchOrderBookContract() {
-	deployerPrivKey := s.keyring.GetPrivKey(0)
-	deployerAddr := s.keyring.GetAddr(0)
+	deployerKey := s.keyring.GetKey(0)
 
 	contractData := factory.ContractDeploymentData{
 		Contract: BatchOrderBookContract,
 	}
 
+	// Note: From address is derived from privKey automatically in v19
 	contractAddr, err := s.factory.DeployContract(
-		deployerPrivKey,
-		evmtypes.EvmTxArgs{
-			From: deployerAddr,
-		},
+		deployerKey.Priv,
+		evmtypes.EvmTxArgs{},
 		contractData,
 	)
 	require.NoError(s.T(), err, "failed to deploy BatchOrderBook contract")
@@ -295,8 +296,7 @@ func (s *MultiNodeLoadTestSuite) runMultiNodeLoadTest(
 	defer ticker.Stop()
 
 	timeout := time.After(time.Duration(durationSec) * time.Second)
-	submitterPrivKey := s.keyring.GetPrivKey(0)
-	submitterAddr := s.keyring.GetAddr(0)
+	submitterKey := s.keyring.GetKey(0)
 
 	secondCount := 0
 
@@ -315,7 +315,7 @@ func (s *MultiNodeLoadTestSuite) runMultiNodeLoadTest(
 				wg.Add(1)
 				go func(batchNum int) {
 					defer wg.Done()
-					s.submitMultiNodeBatch(submitterPrivKey, submitterAddr, tradesPerBatch, stats)
+					s.submitMultiNodeBatch(submitterKey, tradesPerBatch, stats)
 				}(i)
 			}
 			wg.Wait()
@@ -364,24 +364,24 @@ func (s *MultiNodeLoadTestSuite) runMultiNodeLoadTest(
 
 // submitMultiNodeBatch submits a batch and tracks statistics
 func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
-	privKey keyring.Key,
-	from common.Address,
+	key keyring.Key,
 	tradeCount int,
 	stats *MultiNodeLoadTestStats,
 ) {
 	// Generate mock trades
+	from := key.Addr
 	trades := s.generateMockTrades(from, tradeCount)
 
-	// Prepare the contract call
+	// Prepare the contract call - use ABI struct, not string
 	callArgs := factory.CallArgs{
-		ContractABI: BatchOrderBookABI,
+		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "executeBatchTrades",
 		Args:        []interface{}{trades},
 	}
 
 	// Execute the contract call
 	_, err := s.factory.ExecuteContractCall(
-		privKey,
+		key.Priv,
 		evmtypes.EvmTxArgs{
 			To: &s.contractAddr,
 		},
@@ -509,8 +509,9 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 	s.T().Log("║         Contract State Verification                   ║")
 	s.T().Log("╚════════════════════════════════════════════════════════╝\n")
 
+	// Query the contract for stats - use ABI struct, not string
 	callArgs := factory.CallArgs{
-		ContractABI: BatchOrderBookABI,
+		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "getStats",
 		Args:        []interface{}{},
 	}

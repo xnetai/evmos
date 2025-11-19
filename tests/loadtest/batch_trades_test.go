@@ -137,11 +137,10 @@ func (s *BatchTradesLoadTestSuite) deployBatchOrderBookContract() {
 	}
 
 	// Deploy the contract
+	// Note: From address is derived from privKey automatically in v19
 	contractAddr, err := s.factory.DeployContract(
 		deployerPrivKey,
-		evmtypes.EvmTxArgs{
-			From: deployerAddr,
-		},
+		evmtypes.EvmTxArgs{},
 		contractData,
 	)
 	require.NoError(s.T(), err, "failed to deploy BatchOrderBook contract")
@@ -212,7 +211,7 @@ func (s *BatchTradesLoadTestSuite) runLoadTest(
 	defer ticker.Stop()
 
 	timeout := time.After(time.Duration(durationSec) * time.Second)
-	submitterPrivKey := s.keyring.GetPrivKey(0)
+	submitterKey := s.keyring.GetKey(0)
 	submitterAddr := s.keyring.GetAddr(0)
 
 	for {
@@ -227,7 +226,7 @@ func (s *BatchTradesLoadTestSuite) runLoadTest(
 				wg.Add(1)
 				go func(batchNum int) {
 					defer wg.Done()
-					s.submitBatch(submitterPrivKey, submitterAddr, tradesPerBatch, stats)
+					s.submitBatch(submitterKey, submitterAddr, tradesPerBatch, stats)
 				}(i)
 			}
 			wg.Wait()
@@ -258,16 +257,16 @@ func (s *BatchTradesLoadTestSuite) submitBatch(
 	// Generate mock trades
 	trades := s.generateMockTrades(from, tradeCount)
 
-	// Prepare the contract call
+	// Prepare the contract call - use ABI struct, not string
 	callArgs := factory.CallArgs{
-		ContractABI: BatchOrderBookABI,
+		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "executeBatchTrades",
 		Args:        []interface{}{trades},
 	}
 
 	// Execute the contract call
 	_, err := s.factory.ExecuteContractCall(
-		privKey,
+		privKey.Priv,
 		evmtypes.EvmTxArgs{
 			To: &s.contractAddr,
 		},
@@ -337,9 +336,9 @@ func (s *BatchTradesLoadTestSuite) printStats(stats *LoadTestStats) {
 func (s *BatchTradesLoadTestSuite) verifyContractState(stats *LoadTestStats) {
 	s.T().Log("=== Verifying Contract State ===")
 
-	// Query the contract for stats
+	// Query the contract for stats - use ABI struct, not string
 	callArgs := factory.CallArgs{
-		ContractABI: BatchOrderBookABI,
+		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "getStats",
 		Args:        []interface{}{},
 	}
