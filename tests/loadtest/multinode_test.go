@@ -24,6 +24,7 @@ import (
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
+	"github.com/evmos/evmos/v20/utils"
 	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
 	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
 )
@@ -108,8 +109,9 @@ func (s *MultiNodeLoadTestSuite) SetupSuite() {
 	feeMarketGenesis.Params = feeMarketParams
 
 	// Create the network with multiple validators
+	// Using TestingChainID (evmos_9002) which maps to txcoin as the base denom
 	s.network = network.New(
-		network.WithChainID("evmos_9000-1"),
+		network.WithChainID(utils.TestingChainID+"-1"),
 		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
 		network.WithAmountOfValidators(numValidators),
 		network.WithCustomGenesis(network.CustomGenesisState{
@@ -143,6 +145,8 @@ func (s *MultiNodeLoadTestSuite) printNodeStatistics() {
 
 	s.T().Logf("Network Configuration:")
 	s.T().Logf("  - Chain ID: %s", s.network.GetChainID())
+	s.T().Logf("  - Base Denom: %s", s.network.GetBaseDenom())
+	s.T().Logf("  - EVM Denom: %s (for gas consumption/estimating)", evmtypes.GetEVMCoinDenom())
 	s.T().Logf("  - Total Validators: %d", len(validators))
 	s.T().Logf("  - Block Height: %d", ctx.BlockHeight())
 	s.T().Logf("  - Block Time: %s", ctx.BlockTime())
