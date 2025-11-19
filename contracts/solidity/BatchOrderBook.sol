@@ -12,7 +12,7 @@ contract BatchOrderBook {
         uint256 timestamp;
     }
 
-    // Events
+    // Events - emit trade data instead of storing
     event TradeExecuted(
         address indexed trader,
         uint256 indexed orderId,
@@ -30,12 +30,10 @@ contract BatchOrderBook {
         uint256 timestamp
     );
 
-    // Storage
-    mapping(uint256 => Trade[]) public batches;
+    // Storage - only store aggregated statistics for gas efficiency
     uint256 public totalBatches;
     uint256 public totalTrades;
-
-    // Statistics
+    mapping(uint256 => uint256) public batchSizes;
     mapping(uint256 => uint256) public tradesPerBlock;
     uint256 public lastBlockNumber;
 
@@ -46,7 +44,7 @@ contract BatchOrderBook {
     }
 
     /**
-     * @dev Execute a batch of trades
+     * @dev Execute a batch of trades - gas optimized version
      * @param trades Array of Trade structs to execute
      * @return batchId The ID of the executed batch
      */
@@ -56,29 +54,10 @@ contract BatchOrderBook {
         uint256 batchId = totalBatches;
         uint256 currentBlock = block.number;
 
-        // Store all trades in this batch
-        for (uint256 i = 0; i < trades.length; i++) {
-            batches[batchId].push(trades[i]);
+        // Store only batch size, not individual trades
+        batchSizes[batchId] = trades.length;
 
-            // Emit individual trade event
-            emit TradeExecuted(
-                trades[i].trader,
-                trades[i].orderId,
-                trades[i].symbol,
-                trades[i].price,
-                trades[i].amount,
-                trades[i].isBuy,
-                trades[i].timestamp
-            );
-        }
-
-        // Update statistics
-        totalBatches++;
-        totalTrades += trades.length;
-        tradesPerBlock[currentBlock] += trades.length;
-        lastBlockNumber = currentBlock;
-
-        // Emit batch event
+        // Emit batch event with aggregate data
         emit BatchTradesExecuted(
             batchId,
             trades.length,
@@ -86,17 +65,13 @@ contract BatchOrderBook {
             block.timestamp
         );
 
-        return batchId;
-    }
+        // Update statistics
+        totalBatches++;
+        totalTrades += trades.length;
+        tradesPerBlock[currentBlock] += trades.length;
+        lastBlockNumber = currentBlock;
 
-    /**
-     * @dev Get all trades in a specific batch
-     * @param batchId The batch ID to query
-     * @return Array of trades in the batch
-     */
-    function getBatchTrades(uint256 batchId) public view returns (Trade[] memory) {
-        require(batchId < totalBatches, "BatchOrderBook: batch does not exist");
-        return batches[batchId];
+        return batchId;
     }
 
     /**
@@ -106,7 +81,7 @@ contract BatchOrderBook {
      */
     function getBatchSize(uint256 batchId) public view returns (uint256) {
         require(batchId < totalBatches, "BatchOrderBook: batch does not exist");
-        return batches[batchId].length;
+        return batchSizes[batchId];
     }
 
     /**
