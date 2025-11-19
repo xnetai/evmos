@@ -1,8 +1,198 @@
 {
-  "contracts": {
-    "solidity/BatchOrderBook.sol:BatchOrderBook": {
-      "abi": "[{\"inputs\": [], \"stateMutability\": \"nonpayable\", \"type\": \"constructor\"}, {\"anonymous\": false, \"inputs\": [{\"indexed\": true, \"internalType\": \"uint256\", \"name\": \"batchId\", \"type\": \"uint256\"}, {\"indexed\": false, \"internalType\": \"uint256\", \"name\": \"tradeCount\", \"type\": \"uint256\"}, {\"indexed\": false, \"internalType\": \"uint256\", \"name\": \"blockNumber\", \"type\": \"uint256\"}, {\"indexed\": false, \"internalType\": \"uint256\", \"name\": \"timestamp\", \"type\": \"uint256\"}], \"name\": \"BatchTradesExecuted\", \"type\": \"event\"}, {\"anonymous\": false, \"inputs\": [{\"indexed\": true, \"internalType\": \"address\", \"name\": \"trader\", \"type\": \"address\"}, {\"indexed\": true, \"internalType\": \"uint256\", \"name\": \"orderId\", \"type\": \"uint256\"}, {\"indexed\": false, \"internalType\": \"string\", \"name\": \"symbol\", \"type\": \"string\"}, {\"indexed\": false, \"internalType\": \"uint256\", \"name\": \"price\", \"type\": \"uint256\"}, {\"indexed\": false, \"internalType\": \"uint256\", \"name\": \"amount\", \"type\": \"uint256\"}, {\"indexed\": false, \"internalType\": \"bool\", \"name\": \"isBuy\", \"type\": \"bool\"}, {\"indexed\": false, \"internalType\": \"uint256\", \"name\": \"timestamp\", \"type\": \"uint256\"}], \"name\": \"TradeExecuted\", \"type\": \"event\"}, {\"inputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"name\": \"batchSizes\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"stateMutability\": \"view\", \"type\": \"function\"}, {\"inputs\": [{\"components\": [{\"internalType\": \"address\", \"name\": \"trader\", \"type\": \"address\"}, {\"internalType\": \"uint256\", \"name\": \"orderId\", \"type\": \"uint256\"}, {\"internalType\": \"string\", \"name\": \"symbol\", \"type\": \"string\"}, {\"internalType\": \"uint256\", \"name\": \"price\", \"type\": \"uint256\"}, {\"internalType\": \"uint256\", \"name\": \"amount\", \"type\": \"uint256\"}, {\"internalType\": \"bool\", \"name\": \"isBuy\", \"type\": \"bool\"}, {\"internalType\": \"uint256\", \"name\": \"timestamp\", \"type\": \"uint256\"}], \"internalType\": \"struct BatchOrderBook.Trade[]\", \"name\": \"trades\", \"type\": \"tuple[]\"}], \"name\": \"executeBatchTrades\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"stateMutability\": \"nonpayable\", \"type\": \"function\"}, {\"inputs\": [{\"internalType\": \"uint256\", \"name\": \"batchId\", \"type\": \"uint256\"}], \"name\": \"getBatchSize\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"stateMutability\": \"view\", \"type\": \"function\"}, {\"inputs\": [], \"name\": \"getStats\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"_totalBatches\", \"type\": \"uint256\"}, {\"internalType\": \"uint256\", \"name\": \"_totalTrades\", \"type\": \"uint256\"}, {\"internalType\": \"uint256\", \"name\": \"_lastBlock\", \"type\": \"uint256\"}], \"stateMutability\": \"view\", \"type\": \"function\"}, {\"inputs\": [{\"internalType\": \"uint256\", \"name\": \"blockNumber\", \"type\": \"uint256\"}], \"name\": \"getTradesInBlock\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"stateMutability\": \"view\", \"type\": \"function\"}, {\"inputs\": [], \"name\": \"lastBlockNumber\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"stateMutability\": \"view\", \"type\": \"function\"}, {\"inputs\": [], \"name\": \"totalBatches\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"stateMutability\": \"view\", \"type\": \"function\"}, {\"inputs\": [], \"name\": \"totalTrades\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"stateMutability\": \"view\", \"type\": \"function\"}, {\"inputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"name\": \"tradesPerBlock\", \"outputs\": [{\"internalType\": \"uint256\", \"name\": \"\", \"type\": \"uint256\"}], \"stateMutability\": \"view\", \"type\": \"function\"}]",
-      "bin": "6080604052348015600e575f80fd5b505f80819055505f60018190555043600481905550610a6e806100305f395ff3fe608060405234801561000f575f80fd5b5060043610610091575f3560e01c806369ff6abb1161006457806369ff6abb1461014357806382ef2b2e14610161578063b955e9b914610191578063c59d4847146101c1578063e275c997146101e157610091565b806301dd381f146100955780632552317c146100c5578063374fff19146100e357806352e5398f14610113575b5f80fd5b6100af60048036038101906100aa9190610796565b6101ff565b6040516100bc91906107ec565b60405180910390f35b6100cd610308565b6040516100da91906107ec565b60405180910390f35b6100fd60048036038101906100f89190610805565b61030e565b60405161010a91906107ec565b60405180910390f35b61012d60048036038101906101289190610805565b610323565b60405161013a91906107ec565b60405180910390f35b61014b610338565b60405161015891906107ec565b60405180910390f35b61017b60048036038101906101769190610805565b61033d565b60405161018891906107ec565b60405180910390f35b6101ab60048036038101906101a69190610805565b610357565b6040516101b891906107ec565b60405180910390f35b6101c96103b4565b6040516101d893929190610830565b60405180910390f35b6101e96103ca565b6040516101f691906107ec565b60405180910390f35b5f80825111610243576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161023a906108e5565b60405180910390fd5b5f805490505f439050835160025f8481526020019081526020015f2081905550817fc466513bd7d78103bb82a9c2abb0bf987adacaa0c5eb2300312bafcfc6bff7968551834260405161029893929190610830565b60405180910390a25f808154809291906102b190610930565b9190505550835160015f8282546102c89190610977565b92505081905550835160035f8381526020019081526020015f205f8282546102f09190610977565b92505081905550806004819055508192505050919050565b60045481565b6002602052805f5260405f205f915090505481565b6003602052805f5260405f205f915090505481565b5f5481565b5f60035f8381526020019081526020015f20549050919050565b5f8054821061039b576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161039290610a1a565b60405180910390fd5b60025f8381526020019081526020015f20549050919050565b5f805f8054600154600454925092509250909192565b60015481565b5f604051905090565b5f80fd5b5f80fd5b5f80fd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b61042b826103e5565b810181811067ffffffffffffffff8211171561044a576104496103f5565b5b80604052505050565b5f61045c6103d0565b90506104688282610422565b919050565b5f67ffffffffffffffff821115610487576104866103f5565b5b602082029050602081019050919050565b5f80fd5b5f80fd5b5f80fd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6104cd826104a4565b9050919050565b6104dd816104c3565b81146104e7575f80fd5b50565b5f813590506104f8816104d4565b92915050565b5f819050919050565b610510816104fe565b811461051a575f80fd5b50565b5f8135905061052b81610507565b92915050565b5f80fd5b5f67ffffffffffffffff82111561054f5761054e6103f5565b5b610558826103e5565b9050602081019050919050565b828183375f83830152505050565b5f61058561058084610535565b610453565b9050828152602081018484840111156105a1576105a0610531565b5b6105ac848285610565565b509392505050565b5f82601f8301126105c8576105c76103e1565b5b81356105d8848260208601610573565b91505092915050565b5f8115159050919050565b6105f5816105e1565b81146105ff575f80fd5b50565b5f81359050610610816105ec565b92915050565b5f60e0828403121561062b5761062a61049c565b5b61063560e0610453565b90505f610644848285016104ea565b5f8301525060206106578482850161051d565b602083015250604082013567ffffffffffffffff81111561067b5761067a6104a0565b5b610687848285016105b4565b604083015250606061069b8482850161051d565b60608301525060806106af8482850161051d565b60808301525060a06106c384828501610602565b60a08301525060c06106d78482850161051d565b60c08301525092915050565b5f6106f56106f08461046d565b610453565b9050808382526020820190506020840283018581111561071857610717610498565b5b835b8181101561075f57803567ffffffffffffffff81111561073d5761073c6103e1565b5b80860161074a8982610616565b8552602085019450505060208101905061071a565b5050509392505050565b5f82601f83011261077d5761077c6103e1565b5b813561078d8482602086016106e3565b91505092915050565b5f602082840312156107ab576107aa6103d9565b5b5f82013567ffffffffffffffff8111156107c8576107c76103dd565b5b6107d484828501610769565b91505092915050565b6107e6816104fe565b82525050565b5f6020820190506107ff5f8301846107dd565b92915050565b5f6020828403121561081a576108196103d9565b5b5f6108278482850161051d565b91505092915050565b5f6060820190506108435f8301866107dd565b61085060208301856107dd565b61085d60408301846107dd565b949350505050565b5f82825260208201905092915050565b7f42617463684f72646572426f6f6b3a20656d70747920747261646573206172725f8201527f6179000000000000000000000000000000000000000000000000000000000000602082015250565b5f6108cf602283610865565b91506108da82610875565b604082019050919050565b5f6020820190508181035f8301526108fc816108c3565b9050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f61093a826104fe565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff820361096c5761096b610903565b5b600182019050919050565b5f610981826104fe565b915061098c836104fe565b92508282019050808211156109a4576109a3610903565b5b92915050565b7f42617463684f72646572426f6f6b3a20626174636820646f6573206e6f7420655f8201527f7869737400000000000000000000000000000000000000000000000000000000602082015250565b5f610a04602483610865565b9150610a0f826109aa565b604082019050919050565b5f6020820190508181035f830152610a31816109f8565b905091905056fea2646970667358221220e0d32bd334e3f26b41523ec79ee345c53e9da9943ff02c25d1fbea568b1229bf64736f6c634300081a0033"
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "batchId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "tradeCount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "blockNumber",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "BatchTradesExecuted",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "batchSizes",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tradeCount",
+          "type": "uint256"
+        }
+      ],
+      "name": "executeBatchTrades",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "batchId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getBatchSize",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getStats",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "_totalBatches",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_totalTrades",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_lastBlock",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "blockNumber",
+          "type": "uint256"
+        }
+      ],
+      "name": "getTradesInBlock",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lastBlockNumber",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalBatches",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalTrades",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "tradesPerBlock",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     }
-  }
+  ],
+  "bin": "608060405234801561001057600080fd5b5043600481905550610414806100276000396000f3fe608060405234801561001057600080fd5b50600436106100a95760003560e01c806395d89b411161007157806395d89b41146101615780639d5bb53b14610164578063a035b1fe14610177578063d5abeb011461018d578063dd62ed3e14610196578063e985e9c5146101a9576100a9565b806306fdde03146100ae578063095ea7b3146100cc57806318160ddd146100ef57806323b872dd1461010957806370a082311461011c575b600080fd5b6100b66101d5565b6040516100c39190610337565b60405180910390f35b6100df6100da366004610318565b610267565b60405190151581526020016100c3565b6100f7600281565b6040519081526020016100c3565b6100df6100f7366004610318565b610318565b6100f761012a366004610318565b6000546101369190610352565b90565b6100b6610177565b6101be565b6100f7600054815b6040519081526020016100c3565b6101826101896101af366004610318565b610379565b005b600154816001546100f79190610352565b6101626101a3366004610318565b90565b6101826101bd366004610318565b610379565b60606040518060400160405280601181526020017008929e8faca0aad60f4b5caba0a40be960791b815250905090565b600060208284031215610203578081fd5b5035919050565b6000806040838503121561021c578182fd5b50508035926020909101359150565b60008060006060848603121561023f578283fd5b505081359360208301359350604090920135919050565b6001600160a01b0381168114610268578182fd5b50565b6001600160a01b0381168114610279578182fd5b50565b634e487b7160e01b600052601160045260246000fd5b600082198211156102b6576102b661027d565b500190565b6000816102ca576102ca61027d565b506000190190565b6000826102e1576102e161027d565b500490565b60006102f382846102b1565b949350505050565b6000828210156102fd576102fd61027d565b500390565b6000602082528251806020840152815b8181101561032e5760208186018101516040868401015201610311565b8181111561033f5760006040838601015b50601f01601f19169190910160400192915050565b6000821982111561036457610364610352565b500190565b6000816103785761037861027d565b506001019056fea2646970667358221220c7d4c3e3c3d3c3c3c3d3c3c3c3d3c3c3c3d3c3c3c3d3c3c3c3c364736f6c63430008140033"
 }
