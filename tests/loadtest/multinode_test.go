@@ -377,9 +377,17 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 	}
 
 	// Execute the contract call with explicit gas limit
-	// Generous gas limit to ensure batches succeed
-	// For large batches, ABI encoding + execution needs substantial gas
-	gasLimit := uint64(10000000 + (tradeCount * 2000)) // 10M base + 2k per trade
+	// For large batches (30k trades), ABI encoding/decoding of complex structs
+	// with strings consumes massive gas. Using very high limit to ensure success.
+	// Base gas calculation: ~5k gas per trade for ABI encoding + memory + execution
+	gasLimit := uint64(50000000 + (tradeCount * 5000)) // 50M base + 5k per trade
+
+	// Cap at 500M to avoid block gas limit issues while being generous enough
+	maxGas := uint64(500000000)
+	if gasLimit > maxGas {
+		gasLimit = maxGas
+	}
+
 	res, err := s.factory.ExecuteContractCall(
 		key.Priv,
 		evmtypes.EvmTxArgs{
@@ -397,18 +405,25 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 
 	if err != nil {
 		stats.ErrorCount++
-		// Log first few errors for debugging
+		// Log first few errors for debugging with gas info
 		if stats.ErrorCount <= 3 {
-			s.T().Logf("Batch submission error: %v", err)
+			s.T().Logf("Batch submission error (trades=%d, gasLimit=%d): %v", tradeCount, gasLimit, err)
 		}
 	} else if !res.IsOK() {
 		stats.ErrorCount++
 		if stats.ErrorCount <= 3 {
-			s.T().Logf("Batch submission failed: code=%d, log=%s, gas=%d/%d",
-				res.Code, res.Log, res.GasUsed, res.GasWanted)
+			s.T().Logf("Batch submission failed (trades=%d): code=%d, log=%s, gas=%d/%d (%.1f%%)",
+				tradeCount, res.Code, res.Log, res.GasUsed, res.GasWanted,
+				float64(res.GasUsed)/float64(res.GasWanted)*100)
 		}
 	} else {
 		stats.SuccessCount++
+		// Log first few successes to confirm gas usage
+		if stats.SuccessCount <= 3 {
+			s.T().Logf("✓ Batch %d successful: %d trades, gas=%d/%d (%.1f%%)",
+				stats.SuccessCount, tradeCount, res.GasUsed, res.GasWanted,
+				float64(res.GasUsed)/float64(res.GasWanted)*100)
+		}
 	}
 }
 
@@ -530,11 +545,12 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 	callerKey := s.keyring.GetKey(0)
 
 	// Set explicit gas limit for the query (view functions still need gas)
+	// Increase to 50M to handle any state reads
 	res, _, err := s.factory.CallContractAndCheckLogs(
 		callerKey.Priv,
 		evmtypes.EvmTxArgs{
 			To:       &s.contractAddr,
-			GasLimit: 5000000, // 5M gas for view function
+			GasLimit: 50000000, // 50M gas for view function
 		},
 		callArgs,
 		defaultLogCheckArgs,
