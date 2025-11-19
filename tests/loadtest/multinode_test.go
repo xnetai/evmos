@@ -564,7 +564,6 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 	// Verify with expected values
 	stats.mutex.Lock()
 	expectedBatches := stats.SuccessCount
-	expectedTrades := uint64(0)
 	if stats.SuccessCount > 0 {
 		// Calculate expected trades from successful batches
 		s.T().Logf("  ✓ Expected %d successful batches recorded", expectedBatches)
