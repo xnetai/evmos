@@ -5,7 +5,6 @@ package loadtest
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 	"testing"

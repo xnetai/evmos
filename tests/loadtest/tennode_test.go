@@ -5,7 +5,6 @@ package loadtest
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 	"testing"
@@ -524,7 +523,7 @@ func (s *TenNodeLoadTestSuite) printTenNodeStats(stats *MultiNodeLoadTestStats, 
 		s.T().Logf("  - Avg Batch Size: %d trades", tradesPerBatch)
 		s.T().Logf("  - Blocks Produced: %d", len(stats.BlockStats))
 		if len(stats.BlockStats) > 0 {
-			s.T().Logf("  - Avg Block Time: %.2f ms", duration.Milliseconds()/float64(len(stats.BlockStats)))
+			s.T().Logf("  - Avg Block Time: %.2f ms", float64(duration.Milliseconds())/float64(len(stats.BlockStats)))
 		}
 	}
 

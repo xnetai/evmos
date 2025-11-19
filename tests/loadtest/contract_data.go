@@ -36,8 +36,6 @@ func init() {
 		// Log the error but don't panic to allow tests to handle it gracefully
 		return
 	}
-	// Store the ABI struct as string for compatibility
-	BatchOrderBookABI = BatchOrderBookContract.ABI.String()
 	// ABIEvents expects a map of events from the ABI
 	defaultLogCheckArgs = testutil.LogCheckArgs{
 		ABIEvents: BatchOrderBookContract.ABI.Events,

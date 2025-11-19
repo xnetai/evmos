@@ -5,7 +5,6 @@ package loadtest
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"os/exec"
 	"strings"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -127,7 +125,6 @@ func (s *BatchTradesLoadTestSuite) verifyNodesRunning() {
 func (s *BatchTradesLoadTestSuite) deployBatchOrderBookContract() {
 	// Get the deployer account
 	deployerPrivKey := s.keyring.GetPrivKey(0)
-	deployerAddr := s.keyring.GetAddr(0)
 
 	// Load the contract bytecode
 	// Note: This assumes the contract has been compiled
