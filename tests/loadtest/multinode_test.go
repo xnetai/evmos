@@ -80,10 +80,11 @@ func (s *MultiNodeLoadTestSuite) SetupSuite() {
 
 	// Set custom consensus params to handle large transactions (30k trades = ~7.5MB)
 	// Default MaxBytes is 200KB which is too small for our batch sizes
+	// Default MaxGas might be limited, so we set it to a very high value
 	customConsensusParams := &cmtproto.ConsensusParams{
 		Block: &cmtproto.BlockParams{
-			MaxBytes: 20000000, // 20MB to handle large batches
-			MaxGas:   -1,       // no limit
+			MaxBytes: 20000000,            // 20MB to handle large batches
+			MaxGas:   1000000000000000000, // 10^18 gas (effectively unlimited)
 		},
 		Evidence: &cmtproto.EvidenceParams{
 			MaxAgeNumBlocks: 302400,
@@ -401,14 +402,11 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 	// Execute the contract call with explicit gas limit
 	// For large batches (30k trades), ABI encoding/decoding of complex structs
 	// with strings consumes massive gas. Using very high limit to ensure success.
-	// Base gas calculation: ~5k gas per trade for ABI encoding + memory + execution
-	gasLimit := uint64(50000000 + (tradeCount * 5000)) // 50M base + 5k per trade
-
-	// Cap at 500M to avoid block gas limit issues while being generous enough
-	maxGas := uint64(500000000)
-	if gasLimit > maxGas {
-		gasLimit = maxGas
-	}
+	// Each Trade struct has: address(20B) + uint256(32B)*3 + string(~10B) + bool(1B)
+	// ABI encoding overhead for arrays and strings is significant
+	// Testing shows we need ~15k gas per trade minimum
+	gasLimit := uint64(100000000 + (tradeCount * 15000)) // 100M base + 15k per trade
+	// For 30k trades: 100M + 450M = 550M gas
 
 	res, err := s.factory.ExecuteContractCall(
 		key.Priv,
