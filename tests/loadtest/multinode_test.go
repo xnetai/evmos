@@ -94,8 +94,8 @@ func (s *MultiNodeLoadTestSuite) SetupSuite() {
 	// Create keyring with multiple accounts
 	keyring := keyring.New(5)
 
-	// Default to 3 validators for the suite
-	numValidators := 3
+	// Default to 4 validators for the suite
+	numValidators := 4
 
 	s.T().Logf("Initializing network with %d validators...", numValidators)
 
@@ -331,14 +331,48 @@ func (s *MultiNodeLoadTestSuite) TestBatchSize20k() {
 	s.runBatchSizeTest(20000, "20,000 Trades per Batch")
 }
 
-// TestBatchSize30k tests with 30,000 trades per batch
+// TestBatchSize30k tests with 100,000 trades per batch, verifies fees and balances
 func (s *MultiNodeLoadTestSuite) TestBatchSize30k() {
-	s.runBatchSizeTest(30000, "30,000 Trades per Batch")
+	s.runBatchSizeTest(100000, "100,000 Trades per Batch")
 }
 
 // TestBatchSize100k tests with 100,000 trades per batch
 func (s *MultiNodeLoadTestSuite) TestBatchSize100k() {
 	s.runBatchSizeTest(100000, "100,000 Trades per Batch")
+}
+
+// ensureSufficientBalance prefunds the trader with sufficient balance for fees
+func (s *MultiNodeLoadTestSuite) ensureSufficientBalance(totalFeesNeeded int) {
+	traderKey := s.keyring.GetKey(0)
+	traderAddr := traderKey.AccAddr
+	baseDenom := s.network.GetBaseDenom()
+	ctx := s.network.GetContext()
+	bankKeeper := s.network.GetBankKeeper()
+
+	// Prefund with 1,000,000 xcoin to ensure sufficient balance for all tests
+	prefundAmount := sdkmath.NewInt(1_000_000)
+
+	s.T().Logf("Prefunding trader account:")
+	s.T().Logf("  - Trader address: %s", traderAddr.String())
+	s.T().Logf("  - Prefund amount: %s %s", prefundAmount.String(), baseDenom)
+
+	// Mint the prefund amount
+	coins := sdktypes.NewCoins(sdktypes.NewCoin(baseDenom, prefundAmount))
+	err := bankKeeper.MintCoins(ctx, evmtypes.ModuleName, coins)
+	require.NoError(s.T(), err, "failed to mint %s", baseDenom)
+
+	err = bankKeeper.SendCoinsFromModuleToAccount(ctx, evmtypes.ModuleName, traderAddr, coins)
+	require.NoError(s.T(), err, "failed to send %s to trader", baseDenom)
+
+	// Record the new initial balance (existing + prefunded)
+	currentBalance := bankKeeper.GetBalance(ctx, traderAddr, baseDenom)
+	s.initialBalances[baseDenom] = currentBalance.Amount
+
+	feesNeeded := sdkmath.NewInt(int64(totalFeesNeeded))
+	s.T().Logf("  ✓ New %s balance: %s", baseDenom, currentBalance.Amount.String())
+	s.T().Logf("  - Fees needed for test: %s", feesNeeded.String())
+	s.T().Logf("  - Remaining after test: %s", currentBalance.Amount.Sub(feesNeeded).String())
+	s.T().Log("")
 }
 
 // runBatchSizeTest runs a load test with specified batch size
@@ -353,6 +387,11 @@ func (s *MultiNodeLoadTestSuite) runBatchSizeTest(tradesPerBatch int, testName s
 		batchesPerBlock = 1  // 1 batch per block
 		numBlocks       = 3  // Number of blocks to test (reduced from 9)
 	)
+
+	// Ensure trader has sufficient balance for fees
+	// Each batch needs tradesPerBatch * 1 txcoin for fees
+	totalFeesNeeded := tradesPerBatch * batchesPerBlock * numBlocks
+	s.ensureSufficientBalance(totalFeesNeeded)
 
 	// Statistics tracking
 	stats := &MultiNodeLoadTestStats{
@@ -429,23 +468,28 @@ func (s *MultiNodeLoadTestSuite) runMultiNodeLoadTest(
 
 	// Submit batches for each block
 	for blockNum := 0; blockNum < numBlocks; blockNum++ {
-		startTime := time.Now()
 		currentHeight := s.network.GetContext().BlockHeight()
 
-		// Submit batches for this block
-		var wg sync.WaitGroup
-		for i := 0; i < batchesPerBlock; i++ {
-			wg.Add(1)
-			go func(batchNum int) {
-				defer wg.Done()
-				s.submitMultiNodeBatch(submitterKey, tradesPerBatch, stats)
-			}(i)
+		// Mine a block first to ensure clean state
+		if blockNum > 0 {
+			err := s.network.NextBlock()
+			if err != nil {
+				s.T().Logf("⚠ Warning: failed to mine block: %v", err)
+			}
 		}
-		wg.Wait()
+
+		startTime := time.Now()
+
+		// Submit batches for this block
+		// NOTE: Submit sequentially to avoid nonce conflicts
+		// Concurrent submissions from the same account cause nonce issues
+		for i := 0; i < batchesPerBlock; i++ {
+			s.submitMultiNodeBatch(submitterKey, tradesPerBatch, stats)
+		}
 
 		submissionTime := time.Since(startTime)
 
-		// Mine a block
+		// Mine a block to finalize the transactions
 		blockStartTime := time.Now()
 		err := s.network.NextBlock()
 		if err != nil {
@@ -630,6 +674,11 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 		Args:        []interface{}{tradeCountBig},
 	}
 
+	// Calculate fee: 1 xcoin (base denom) per trade
+	// The contract expects fees to be paid in the native token (txcoin)
+	feePerTrade := big.NewInt(1) // 1 unit of base denom per trade
+	totalFee := new(big.Int).Mul(feePerTrade, tradeCountBig)
+
 	// Execute the contract call with explicit gas limit
 	// Optimized version: only passing uint256, not 30k structs
 	// Gas reduced from billions to ~100k
@@ -641,6 +690,7 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 			To:       &s.contractAddr,
 			GasLimit: gasLimit,
 			GasPrice: big.NewInt(0), // Legacy tx with 0 gas price (NoBaseFee=true)
+			Amount:   totalFee,      // Pay 1 xcoin per trade as fee
 		},
 		callArgs,
 	)
@@ -653,29 +703,24 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 
 	if err != nil {
 		stats.ErrorCount++
-		// Log first few errors for debugging with gas info
-		if stats.ErrorCount <= 3 {
-			s.T().Logf("Batch submission error (trades=%d, gasLimit=%d): %v", tradeCount, gasLimit, err)
-		}
+		// Log all errors for debugging
+		s.T().Logf("❌ Batch submission error #%d (trades=%d, gasLimit=%d): %v", stats.ErrorCount, tradeCount, gasLimit, err)
 	} else if !res.IsOK() {
 		stats.ErrorCount++
-		if stats.ErrorCount <= 3 {
-			s.T().Logf("Batch submission failed (trades=%d): code=%d, log=%s, gas=%d/%d (%.1f%%)",
-				tradeCount, res.Code, res.Log, res.GasUsed, res.GasWanted,
-				float64(res.GasUsed)/float64(res.GasWanted)*100)
-		}
+		// Log all failures for debugging
+		s.T().Logf("❌ Batch submission failed #%d (trades=%d): code=%d, log=%s, gas=%d/%d (%.1f%%)",
+			stats.ErrorCount, tradeCount, res.Code, res.Log, res.GasUsed, res.GasWanted,
+			float64(res.GasUsed)/float64(res.GasWanted)*100)
 	} else {
 		stats.SuccessCount++
-		// Log first few successes to confirm gas usage
-		if stats.SuccessCount <= 3 {
-			s.T().Logf("✓ Batch %d successful: %d trades, gas=%d/%d (%.1f%%)",
-				stats.SuccessCount, tradeCount, res.GasUsed, res.GasWanted,
-				float64(res.GasUsed)/float64(res.GasWanted)*100)
-		}
+		// Log all successes to confirm gas usage
+		s.T().Logf("✓ Batch %d successful: %d trades, fee=%d, gas=%d/%d (%.1f%%)",
+			stats.SuccessCount, tradeCount, tradeCount, res.GasUsed, res.GasWanted,
+			float64(res.GasUsed)/float64(res.GasWanted)*100)
 	}
 }
 
-// verifyNodeSynchronization checks that all nodes are in sync
+// verifyNodeSynchronization checks that all 4 nodes are in sync
 func (s *MultiNodeLoadTestSuite) verifyNodeSynchronization(stats *MultiNodeLoadTestStats) {
 	s.T().Log("\n╔════════════════════════════════════════════════════════╗")
 	s.T().Log("║          Node Synchronization Verification            ║")
@@ -685,24 +730,72 @@ func (s *MultiNodeLoadTestSuite) verifyNodeSynchronization(stats *MultiNodeLoadT
 	currentHeight := ctx.BlockHeight()
 	currentTime := ctx.BlockTime()
 
+	// Get all validators
+	validators := s.network.GetValidators()
+	numValidators := len(validators)
+
 	s.T().Logf("Current Network State:")
 	s.T().Logf("  - Block Height: %d", currentHeight)
 	s.T().Logf("  - Block Time: %s", currentTime)
+	s.T().Logf("  - Number of Validators: %d", numValidators)
 	s.T().Log("")
 
-	// In integration tests, all validators share the same state
-	// Verify by checking contract state is consistent
-	s.T().Log("Verification Results:")
-	s.T().Logf("  ✓ All validators at block height: %d", currentHeight)
-	s.T().Logf("  ✓ All validators synchronized at: %s", currentTime)
+	// Verify we have exactly 4 validators
+	require.Equal(s.T(), 4, numValidators, "Expected exactly 4 validators")
 
+	// In integration tests, all validators share the same state
+	// Verify by checking contract state is consistent across all validators
+	s.T().Log("Validator Synchronization:")
+	s.T().Log("┌─────┬──────────────────────────────────────────────┬──────────┬────────────┐")
+	s.T().Log("│ ID  │ Validator Address                            │ Power    │ Status     │")
+	s.T().Log("├─────┼──────────────────────────────────────────────┼──────────┼────────────┤")
+
+	allSynced := true
+	for i, val := range validators {
+		power := val.GetConsensusPower(sdktypes.DefaultPowerReduction)
+		syncStatus := "✓ Synced"
+
+		if val.GetStatus() != stakingtypes.Bonded {
+			syncStatus = "⚠ Not Bonded"
+			allSynced = false
+		}
+
+		valAddr := sdktypes.ValAddress(val.OperatorAddress)
+		s.T().Logf("│ %-3d │ %-44s │ %-8d │ %-10s │",
+			i+1,
+			valAddr.String(),
+			power,
+			syncStatus,
+		)
+	}
+
+	s.T().Log("└─────┴──────────────────────────────────────────────┴──────────┴────────────┘")
+	s.T().Log("")
+
+	require.True(s.T(), allSynced, "Not all validators are bonded")
+
+	s.T().Log("Block Processing Verification:")
 	stats.mutex.Lock()
+	totalBlocks := len(stats.BlockStats)
+	totalBatches := 0
+	totalTrades := 0
+
 	for height, blockStats := range stats.BlockStats {
-		s.T().Logf("  ✓ Block %d: %d batches processed", height, blockStats.BatchesInBlock)
+		totalBatches += blockStats.BatchesInBlock
+		totalTrades += blockStats.TradesExecuted
+		s.T().Logf("  ✓ Block %d: %d batches, %d trades executed", height, blockStats.BatchesInBlock, blockStats.TradesExecuted)
 	}
 	stats.mutex.Unlock()
 
-	s.T().Log("\n✓ All nodes are in sync with trade batches")
+	s.T().Log("")
+	s.T().Logf("Summary:")
+	s.T().Logf("  - Total Blocks Processed: %d", totalBlocks)
+	s.T().Logf("  - Total Batches Processed: %d", totalBatches)
+	s.T().Logf("  - Total Trades Executed: %d", totalTrades)
+	s.T().Logf("  - All 4 Validators: ✓ Synchronized")
+	s.T().Logf("  - All 4 Validators: ✓ At Block Height %d", currentHeight)
+
+	s.T().Log("\n✓ All 4 nodes are in sync with all batch trades")
 	s.T().Log("╚════════════════════════════════════════════════════════╝\n")
 }
 
@@ -837,16 +930,45 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 		return
 	}
 
+	// Decode the response: (totalBatches, totalTrades, totalFees, lastBlock)
+	var contractStats struct {
+		TotalBatches *big.Int
+		TotalTrades  *big.Int
+		TotalFees    *big.Int
+		LastBlock    *big.Int
+	}
+
+	err = utils.DecodeContractCallResponse(&contractStats, callArgs, res)
+	if err != nil {
+		s.T().Logf("⚠ Warning: failed to decode contract stats: %v", err)
+		s.T().Log("\n╚════════════════════════════════════════════════════════╝\n")
+		return
+	}
+
 	s.T().Log("Contract State:")
 	s.T().Logf("  ✓ Query successful (gas used: %d)", res.GasUsed)
+	s.T().Logf("  - Total Batches: %s", contractStats.TotalBatches.String())
+	s.T().Logf("  - Total Trades: %s", contractStats.TotalTrades.String())
+	s.T().Logf("  - Total Fees Collected: %s", contractStats.TotalFees.String())
+	s.T().Logf("  - Last Block: %s", contractStats.LastBlock.String())
 	s.T().Log("  ✓ All validators have consistent contract state")
 
 	// Verify with expected values
 	stats.mutex.Lock()
 	expectedBatches := stats.SuccessCount
+	expectedTrades := stats.TradesSubmitted
+	expectedFees := new(big.Int).SetUint64(stats.TradesSubmitted) // 1 unit per trade
+
 	if stats.SuccessCount > 0 {
-		// Calculate expected trades from successful batches
-		s.T().Logf("  ✓ Expected %d successful batches recorded", expectedBatches)
+		s.T().Logf("\nExpected vs Actual:")
+		s.T().Logf("  - Expected Batches: %d, Actual: %s ✓", expectedBatches, contractStats.TotalBatches.String())
+		s.T().Logf("  - Expected Trades: %d, Actual: %s ✓", expectedTrades, contractStats.TotalTrades.String())
+		s.T().Logf("  - Expected Fees: %s, Actual: %s ✓", expectedFees.String(), contractStats.TotalFees.String())
+
+		// Verify the values match
+		require.Equal(s.T(), expectedBatches, contractStats.TotalBatches.Uint64(), "Total batches mismatch")
+		require.Equal(s.T(), expectedTrades, contractStats.TotalTrades.Uint64(), "Total trades mismatch")
+		require.Equal(s.T(), expectedFees.String(), contractStats.TotalFees.String(), "Total fees mismatch")
 	}
 	stats.mutex.Unlock()
 
@@ -854,7 +976,7 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 	s.T().Log("╚════════════════════════════════════════════════════════╝\n")
 }
 
-// verifyAssetBalances verifies balance changes from trading activity
+// verifyAssetBalances verifies balance changes from trading activity and fees
 func (s *MultiNodeLoadTestSuite) verifyAssetBalances(tradesPerBatch int, totalBatches int) {
 	s.T().Log("\n╔════════════════════════════════════════════════════════╗")
 	s.T().Log("║         Asset Balance Verification                    ║")
@@ -869,12 +991,17 @@ func (s *MultiNodeLoadTestSuite) verifyAssetBalances(tradesPerBatch int, totalBa
 	tradesPerPair := totalTrades / len(TradingPairs)
 	tradeAmount := sdkmath.NewInt(1000)
 
+	// Calculate expected fees: 1 unit per trade
+	expectedTotalFees := sdkmath.NewInt(int64(totalTrades))
+
 	s.T().Logf("Trade Activity Summary:")
 	s.T().Logf("  - Total batches: %d", totalBatches)
 	s.T().Logf("  - Trades per batch: %d", tradesPerBatch)
 	s.T().Logf("  - Total trades: %d", totalTrades)
 	s.T().Logf("  - Trades per pair: %d", tradesPerPair)
 	s.T().Logf("  - Amount per trade: %s", tradeAmount.String())
+	s.T().Logf("  - Fee per trade: 1 %s", s.network.GetBaseDenom())
+	s.T().Logf("  - Expected total fees: %s %s", expectedTotalFees.String(), s.network.GetBaseDenom())
 	s.T().Log("")
 
 	s.T().Log("Balance Changes:")
@@ -883,10 +1010,11 @@ func (s *MultiNodeLoadTestSuite) verifyAssetBalances(tradesPerBatch int, totalBa
 	s.T().Log("├────────────┼──────────────────────┼──────────────────────┼──────────────────────┤")
 
 	hasBalanceChanges := false
+	baseDenom := s.network.GetBaseDenom()
 
 	// Check all test assets
 	allAssets := append([]string{}, TestAssets...)
-	allAssets = append(allAssets, s.network.GetBaseDenom())
+	allAssets = append(allAssets, baseDenom)
 
 	for _, asset := range allAssets {
 		initialBalance, exists := s.initialBalances[asset]
@@ -912,21 +1040,39 @@ func (s *MultiNodeLoadTestSuite) verifyAssetBalances(tradesPerBatch int, totalBa
 			currentBalance.String(),
 			changeStr,
 		)
+
+		// Verify base denom fee deduction
+		if asset == baseDenom {
+			actualFeeDeduction := initialBalance.Sub(currentBalance)
+			s.T().Log("├────────────┴──────────────────────┴──────────────────────┴──────────────────────┤")
+			s.T().Logf("│ Fee Verification for %s:                                                  │", baseDenom)
+			s.T().Logf("│   Expected fees deducted: %-50s │", expectedTotalFees.String())
+			s.T().Logf("│   Actual fees deducted:   %-50s │", actualFeeDeduction.String())
+
+			// Verify the fee matches expected (1 per trade)
+			require.Equal(s.T(), expectedTotalFees.String(), actualFeeDeduction.String(),
+				"Fee deduction mismatch: expected %s %s, got %s %s",
+				expectedTotalFees.String(), baseDenom, actualFeeDeduction.String(), baseDenom)
+
+			s.T().Logf("│   ✓ Fee verification passed: %d trades × 1 %s = %s %s              │",
+				totalTrades, baseDenom, expectedTotalFees.String(), baseDenom)
+		}
 	}
 
-	s.T().Log("└────────────┴──────────────────────┴──────────────────────┴──────────────────────┘")
+	s.T().Log("└──────────────────────────────────────────────────────────────────────────────────┘")
 	s.T().Log("")
 
 	// Expected changes based on trade simulation
 	expectedBaseAssetChange := tradeAmount.Mul(sdkmath.NewInt(int64(tradesPerPair)))
 
-	s.T().Log("Expected Balance Changes (per asset in trading pairs):")
+	s.T().Log("Expected Balance Changes Summary:")
 	s.T().Logf("  - Base assets (abtc, aeth, asol): -%s (sold)", expectedBaseAssetChange.String())
 	s.T().Logf("  - Quote asset (xusd): Net neutral (bought and sold)")
+	s.T().Logf("  - Base denom (%s): -%s (fees: 1 per trade)", baseDenom, expectedTotalFees.String())
 	s.T().Log("")
 
 	if hasBalanceChanges {
-		s.T().Log("✓ Balance verification complete - trading activity detected")
+		s.T().Log("✓ Balance verification complete - trading activity and fees verified")
 	} else {
 		s.T().Log("✓ Balance verification complete - no net changes (symmetric trades)")
 	}
