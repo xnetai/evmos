@@ -378,11 +378,14 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 		Args:        []interface{}{trades},
 	}
 
-	// Execute the contract call
+	// Execute the contract call with explicit gas limit
+	// Gas usage: ~500 gas per trade + ~100k base
+	gasLimit := uint64(100000 + (tradeCount * 1000))
 	_, err := s.factory.ExecuteContractCall(
 		key.Priv,
 		evmtypes.EvmTxArgs{
-			To: &s.contractAddr,
+			To:       &s.contractAddr,
+			GasLimit: gasLimit,
 		},
 		callArgs,
 	)
@@ -508,7 +511,7 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 	s.T().Log("║         Contract State Verification                   ║")
 	s.T().Log("╚════════════════════════════════════════════════════════╝\n")
 
-	// Query the contract for stats - use ABI struct, not string
+	// Query the contract for stats with explicit gas limit
 	callArgs := factory.CallArgs{
 		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "getStats",
@@ -517,10 +520,12 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 
 	callerPrivKey := s.keyring.GetPrivKey(0)
 
+	// Set explicit gas limit for the query (view functions still need gas)
 	res, _, err := s.factory.CallContractAndCheckLogs(
 		callerPrivKey,
 		evmtypes.EvmTxArgs{
-			To: &s.contractAddr,
+			To:       &s.contractAddr,
+			GasLimit: 1000000, // 1M gas for view function
 		},
 		callArgs,
 		defaultLogCheckArgs,

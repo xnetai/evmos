@@ -229,7 +229,8 @@ func (s *TenNodeLoadTestSuite) verifyContractDeployment() {
 	res, _, err := s.factory.CallContractAndCheckLogs(
 		callerPrivKey,
 		evmtypes.EvmTxArgs{
-			To: &s.contractAddr,
+			To:       &s.contractAddr,
+			GasLimit: 1000000, // 1M gas for view function
 		},
 		callArgs,
 		defaultLogCheckArgs,
@@ -418,11 +419,14 @@ func (s *TenNodeLoadTestSuite) submitTenNodeBatch(
 		Args:        []interface{}{trades},
 	}
 
-	// Execute the contract call
+	// Execute the contract call with explicit gas limit
+	// Gas usage: ~500 gas per trade + ~100k base
+	gasLimit := uint64(100000 + (tradeCount * 1000))
 	_, err := s.factory.ExecuteContractCall(
 		key.Priv,
 		evmtypes.EvmTxArgs{
-			To: &s.contractAddr,
+			To:       &s.contractAddr,
+			GasLimit: gasLimit,
 		},
 		callArgs,
 	)
@@ -554,7 +558,8 @@ func (s *TenNodeLoadTestSuite) verifyTenNodeContractState(stats *MultiNodeLoadTe
 	res, _, err := s.factory.CallContractAndCheckLogs(
 		callerPrivKey,
 		evmtypes.EvmTxArgs{
-			To: &s.contractAddr,
+			To:       &s.contractAddr,
+			GasLimit: 1000000, // 1M gas for view function
 		},
 		callArgs,
 		defaultLogCheckArgs,

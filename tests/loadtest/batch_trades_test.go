@@ -261,11 +261,14 @@ func (s *BatchTradesLoadTestSuite) submitBatch(
 		Args:        []interface{}{trades},
 	}
 
-	// Execute the contract call
+	// Execute the contract call with explicit gas limit
+	// Gas usage: ~500 gas per trade + ~100k base
+	gasLimit := uint64(100000 + (tradeCount * 1000))
 	_, err := s.factory.ExecuteContractCall(
 		privKey.Priv,
 		evmtypes.EvmTxArgs{
-			To: &s.contractAddr,
+			To:       &s.contractAddr,
+			GasLimit: gasLimit,
 		},
 		callArgs,
 	)
