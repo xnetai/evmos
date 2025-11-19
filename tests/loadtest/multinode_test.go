@@ -409,10 +409,13 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 ) {
 	// Prepare the contract call - pass trade count only (ultra-optimized)
 	// No need to generate or encode 30k trade structs, dramatically reducing gas
+	// Convert to *big.Int for ABI encoding
+	tradeCountBig := new(big.Int).SetUint64(uint64(tradeCount))
+
 	callArgs := factory.CallArgs{
 		ContractABI: BatchOrderBookContract.ABI,
 		MethodName:  "executeBatchTrades",
-		Args:        []interface{}{big.NewInt(int64(tradeCount))}, // Pass count, not array
+		Args:        []interface{}{tradeCountBig},
 	}
 
 	// Execute the contract call with explicit gas limit
