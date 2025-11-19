@@ -10,11 +10,13 @@ import (
 	"testing"
 	"time"
 
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
+	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
@@ -76,11 +78,31 @@ func (s *MultiNodeLoadTestSuite) SetupSuite() {
 
 	s.T().Logf("Initializing network with %d validators...", numValidators)
 
+	// Set custom consensus params to handle large transactions (30k trades = ~7.5MB)
+	// Default MaxBytes is 200KB which is too small for our batch sizes
+	customConsensusParams := &cmtproto.ConsensusParams{
+		Block: &cmtproto.BlockParams{
+			MaxBytes: 20000000, // 20MB to handle large batches
+			MaxGas:   -1,       // no limit
+		},
+		Evidence: &cmtproto.EvidenceParams{
+			MaxAgeNumBlocks: 302400,
+			MaxAgeDuration:  504 * time.Hour, // 3 weeks
+			MaxBytes:        10000,
+		},
+		Validator: &cmtproto.ValidatorParams{
+			PubKeyTypes: []string{"ed25519"},
+		},
+	}
+
 	// Create the network with multiple validators
 	s.network = network.New(
 		network.WithChainID("evmos_9000-1"),
 		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
 		network.WithAmountOfValidators(numValidators),
+		network.WithCustomGenesis(network.CustomGenesisState{
+			consensustypes.ModuleName: customConsensusParams,
+		}),
 	)
 
 	s.grpcHandler = grpc.NewIntegrationHandler(s.network)
