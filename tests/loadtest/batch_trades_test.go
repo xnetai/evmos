@@ -262,9 +262,9 @@ func (s *BatchTradesLoadTestSuite) submitBatch(
 	}
 
 	// Execute the contract call with explicit gas limit
-	// Gas usage: ~500 gas per trade + ~100k base
-	gasLimit := uint64(100000 + (tradeCount * 1000))
-	_, err := s.factory.ExecuteContractCall(
+	// Generous gas limit to ensure batches succeed
+	gasLimit := uint64(10000000 + (tradeCount * 2000)) // 10M base + 2k per trade
+	res, err := s.factory.ExecuteContractCall(
 		privKey.Priv,
 		evmtypes.EvmTxArgs{
 			To:       &s.contractAddr,
@@ -281,7 +281,15 @@ func (s *BatchTradesLoadTestSuite) submitBatch(
 
 	if err != nil {
 		stats.ErrorCount++
-		s.T().Logf("Error submitting batch: %v", err)
+		if stats.ErrorCount <= 3 {
+			s.T().Logf("Batch submission error: %v", err)
+		}
+	} else if !res.IsOK() {
+		stats.ErrorCount++
+		if stats.ErrorCount <= 3 {
+			s.T().Logf("Batch submission failed: code=%d, log=%s, gas=%d/%d",
+				res.Code, res.Log, res.GasUsed, res.GasWanted)
+		}
 	} else {
 		stats.SuccessCount++
 	}
