@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
 	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
 )
 
 // MultiNodeLoadTestSuite tests batch trades with multiple validators
@@ -96,13 +98,23 @@ func (s *MultiNodeLoadTestSuite) SetupSuite() {
 		},
 	}
 
+	// Set up feemarket params to disable base fee (make transactions free)
+	// This eliminates gas cost concerns for large batch transactions
+	feeMarketParams := feemarkettypes.DefaultParams()
+	feeMarketParams.NoBaseFee = true           // Disable base fee
+	feeMarketParams.MinGasPrice = sdkmath.LegacyZeroDec() // Set min gas price to zero
+
+	feeMarketGenesis := feemarkettypes.DefaultGenesisState()
+	feeMarketGenesis.Params = feeMarketParams
+
 	// Create the network with multiple validators
 	s.network = network.New(
 		network.WithChainID("evmos_9000-1"),
 		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
 		network.WithAmountOfValidators(numValidators),
 		network.WithCustomGenesis(network.CustomGenesisState{
-			consensustypes.ModuleName: customConsensusParams,
+			consensustypes.ModuleName:   customConsensusParams,
+			feemarkettypes.ModuleName: feeMarketGenesis,
 		}),
 	)
 
@@ -401,12 +413,12 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 
 	// Execute the contract call with explicit gas limit
 	// For large batches (30k trades), ABI encoding/decoding of complex structs
-	// with strings consumes massive gas. Using very high limit to ensure success.
-	// Each Trade struct has: address(20B) + uint256(32B)*3 + string(~10B) + bool(1B)
-	// ABI encoding overhead for arrays and strings is significant
-	// Testing shows we need ~15k gas per trade minimum
-	gasLimit := uint64(100000000 + (tradeCount * 15000)) // 100M base + 15k per trade
-	// For 30k trades: 100M + 450M = 550M gas
+	// with strings consumes MASSIVE amounts of gas. Memory allocation for strings
+	// in Solidity is extremely expensive.
+	// Each Trade struct: address(20B) + 3×uint256(96B) + string(~10B variable) + bool(1B) + uint256(32B)
+	// ABI decoding calldata to memory for 30k structs with dynamic strings needs billions of gas
+	// Setting to 5 billion gas to ensure we don't hit limits
+	gasLimit := uint64(5000000000) // 5 billion gas for 30k trades
 
 	res, err := s.factory.ExecuteContractCall(
 		key.Priv,
