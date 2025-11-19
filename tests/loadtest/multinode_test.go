@@ -220,10 +220,13 @@ func (s *MultiNodeLoadTestSuite) deployBatchOrderBookContract() {
 		Contract: BatchOrderBookContract,
 	}
 
-	// Note: From address is derived from privKey automatically in v19
+	// Use legacy transaction with zero gas price (NoBaseFee=true allows this)
+	// This avoids EIP-1559 validation errors where GasTipCap > GasFeeCap
 	contractAddr, err := s.factory.DeployContract(
 		deployerKey.Priv,
-		evmtypes.EvmTxArgs{},
+		evmtypes.EvmTxArgs{
+			GasPrice: big.NewInt(0), // Legacy tx with 0 gas price
+		},
 		contractData,
 	)
 	require.NoError(s.T(), err, "failed to deploy BatchOrderBook contract")
@@ -429,6 +432,7 @@ func (s *MultiNodeLoadTestSuite) submitMultiNodeBatch(
 		evmtypes.EvmTxArgs{
 			To:       &s.contractAddr,
 			GasLimit: gasLimit,
+			GasPrice: big.NewInt(0), // Legacy tx with 0 gas price (NoBaseFee=true)
 		},
 		callArgs,
 	)
@@ -586,7 +590,8 @@ func (s *MultiNodeLoadTestSuite) verifyMultiNodeContractState(stats *MultiNodeLo
 		callerKey.Priv,
 		evmtypes.EvmTxArgs{
 			To:       &s.contractAddr,
-			GasLimit: 50000000, // 50M gas for view function
+			GasLimit: 50000000,          // 50M gas for view function
+			GasPrice: big.NewInt(0),     // Legacy tx with 0 gas price
 		},
 		callArgs,
 		defaultLogCheckArgs,
