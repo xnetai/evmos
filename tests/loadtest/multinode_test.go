@@ -455,13 +455,18 @@ func (s *MultiNodeLoadTestSuite) runMultiNodeLoadTest(
 
 		// Record block stats
 		stats.mutex.Lock()
-		tradesInBlock := tradesPerBatch * batchesPerBlock
+		tradesSubmittedInBlock := tradesPerBatch * batchesPerBlock
+
+		// Query contract to verify actual executed trades in this block
+		tradesExecutedInBlock := s.queryTradesInBlock(newHeight)
+
 		if _, exists := stats.BlockStats[newHeight]; !exists {
 			stats.BlockStats[newHeight] = &BlockSyncStats{
 				Height:              newHeight,
 				BatchesInBlock:      batchesPerBlock,
 				TransactionsInBlock: batchesPerBlock, // 1 tx per batch
-				TradesExecuted:      tradesInBlock,
+				TradesSubmitted:     tradesSubmittedInBlock,
+				TradesExecuted:      tradesExecutedInBlock,
 				Timestamp:           time.Now(),
 				AllNodesSynced:      true,
 			}
@@ -470,12 +475,18 @@ func (s *MultiNodeLoadTestSuite) runMultiNodeLoadTest(
 
 		// Print progress with timing
 		stats.mutex.Lock()
-		s.T().Logf("Block %d/%d: %d txs, %d batches, %d trades | Submission: %v | Block: %d→%d (%v) | Success: %d | Errors: %d",
+		batchStatus := "✓"
+		if tradesExecutedInBlock == 0 && tradesSubmittedInBlock > 0 {
+			batchStatus = "✗" // Failed - no trades executed despite submissions
+		}
+		s.T().Logf("Block %d/%d: %d txs, %d batches, %d submitted, %d executed %s | Submission: %v | Block: %d→%d (%v) | Success: %d | Errors: %d",
 			blockNum+1,
 			numBlocks,
-			batchesPerBlock, // transactions
-			batchesPerBlock, // batches
-			tradesInBlock,   // trades
+			batchesPerBlock,             // transactions
+			batchesPerBlock,             // batches
+			tradesSubmittedInBlock,      // trades submitted
+			tradesExecutedInBlock,       // trades actually executed (verified)
+			batchStatus,
 			submissionTime.Round(time.Millisecond),
 			currentHeight,
 			newHeight,
@@ -487,6 +498,50 @@ func (s *MultiNodeLoadTestSuite) runMultiNodeLoadTest(
 	}
 
 	s.T().Log("✓ Load test completed")
+}
+
+// queryTradesInBlock queries the contract to get actual executed trades for a specific block
+func (s *MultiNodeLoadTestSuite) queryTradesInBlock(blockHeight int64) int {
+	// Query the contract for trades in this block
+	blockHeightBig := new(big.Int).SetInt64(blockHeight)
+
+	callArgs := factory.CallArgs{
+		ContractABI: BatchOrderBookContract.ABI,
+		MethodName:  "getTradesInBlock",
+		Args:        []interface{}{blockHeightBig},
+	}
+
+	callerKey := s.keyring.GetKey(0)
+
+	// Use ExecuteContractCall for view function
+	res, err := s.factory.ExecuteContractCall(
+		callerKey.Priv,
+		evmtypes.EvmTxArgs{
+			To:       &s.contractAddr,
+			GasLimit: 1000000,       // 1M gas for view function
+			GasPrice: big.NewInt(0), // Legacy tx with 0 gas price
+		},
+		callArgs,
+	)
+
+	if err != nil || !res.IsOK() {
+		// If query fails, return 0 (can't verify executed trades)
+		return 0
+	}
+
+	// Parse the result - it's a uint256
+	if len(res.Ret) == 0 {
+		return 0
+	}
+
+	// Decode the return value (uint256)
+	var tradesExecuted *big.Int
+	err = BatchOrderBookContract.ABI.UnpackIntoInterface(&tradesExecuted, "getTradesInBlock", res.Ret)
+	if err != nil {
+		return 0
+	}
+
+	return int(tradesExecuted.Int64())
 }
 
 // simulateAssetTrades simulates trading activity by transferring assets
@@ -704,21 +759,39 @@ func (s *MultiNodeLoadTestSuite) printMultiNodeStats(stats *MultiNodeLoadTestSta
 		s.T().Log("")
 		s.T().Log("Per-Block Statistics:")
 		totalTransactions := uint64(0)
+		totalTradesSubmitted := uint64(0)
+		totalTradesExecuted := uint64(0)
 		for _, height := range blockHeights {
 			blockStat := stats.BlockStats[height]
 			totalBatchesInBlocks += uint64(blockStat.BatchesInBlock)
-			totalTradesInBlocks += uint64(blockStat.TradesExecuted)
+			totalTradesSubmitted += uint64(blockStat.TradesSubmitted)
+			totalTradesExecuted += uint64(blockStat.TradesExecuted)
 			totalTransactions += uint64(blockStat.TransactionsInBlock)
-			s.T().Logf("  - Block %d: %d transactions, %d batches, %d trades executed",
-				height, blockStat.TransactionsInBlock, blockStat.BatchesInBlock, blockStat.TradesExecuted)
+			totalTradesInBlocks += uint64(blockStat.TradesExecuted) // For backward compatibility
+
+			// Only show executed trades if batches passed
+			if blockStat.TradesExecuted > 0 {
+				status := "✓"
+				s.T().Logf("  %s Block %d: %d txs, %d batches, %d submitted, %d executed",
+					status, height, blockStat.TransactionsInBlock, blockStat.BatchesInBlock,
+					blockStat.TradesSubmitted, blockStat.TradesExecuted)
+			} else if blockStat.TradesSubmitted > 0 {
+				// Batches were submitted but none executed (failed)
+				status := "✗"
+				s.T().Logf("  %s Block %d: %d txs, %d batches, %d submitted, 0 executed (FAILED)",
+					status, height, blockStat.TransactionsInBlock, blockStat.BatchesInBlock,
+					blockStat.TradesSubmitted)
+			}
 		}
 
 		s.T().Log("")
 		s.T().Logf("  - Total transactions: %d", totalTransactions)
-		s.T().Logf("  - Total trades executed: %d", totalTradesInBlocks)
+		s.T().Logf("  - Total trades submitted: %d", totalTradesSubmitted)
+		s.T().Logf("  - Total trades executed (verified): %d", totalTradesExecuted)
+		s.T().Logf("  - Execution success rate: %.2f%%", float64(totalTradesExecuted)/float64(totalTradesSubmitted)*100)
 		s.T().Logf("  - Avg Transactions/Block: %.2f", float64(totalTransactions)/float64(len(stats.BlockStats)))
 		s.T().Logf("  - Avg Batches/Block: %.2f", float64(totalBatchesInBlocks)/float64(len(stats.BlockStats)))
-		s.T().Logf("  - Avg Trades/Block: %.2f", float64(totalTradesInBlocks)/float64(len(stats.BlockStats)))
+		s.T().Logf("  - Avg Trades Executed/Block: %.2f", float64(totalTradesExecuted)/float64(len(stats.BlockStats)))
 	}
 	s.T().Log("")
 
@@ -879,12 +952,13 @@ type MultiNodeLoadTestStats struct {
 
 // BlockSyncStats holds synchronization stats for a specific block
 type BlockSyncStats struct {
-	Height           int64
-	BatchesInBlock   int
+	Height              int64
+	BatchesInBlock      int
 	TransactionsInBlock int  // Track number of transactions
-	TradesExecuted   int     // Trades that were executed in this block
-	Timestamp        time.Time
-	AllNodesSynced   bool
+	TradesSubmitted     int  // Trades that were submitted in this block
+	TradesExecuted      int  // Trades that were actually executed (verified from contract)
+	Timestamp           time.Time
+	AllNodesSynced      bool
 }
 
 // ValidatorStats holds statistics for a specific validator
