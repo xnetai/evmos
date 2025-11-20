@@ -73,13 +73,21 @@ func NewProductionNetwork(numValidators int) (*ProductionNetwork, error) {
 
 // initValidatorConfigs initializes configuration for each validator
 func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
-	// Use evmosd testnet init-files to create validator configurations
-	evmosdPath, err := exec.LookPath("evmosd")
+	// Try to find xcoind binary first, fallback to evmosd
+	binaryName := "xcoind"
+	binaryPath, err := exec.LookPath(binaryName)
 	if err != nil {
-		return fmt.Errorf("evmosd binary not found in PATH: %w", err)
+		// Try evmosd as fallback
+		binaryName = "evmosd"
+		binaryPath, err = exec.LookPath(binaryName)
+		if err != nil {
+			return fmt.Errorf("neither xcoind nor evmosd binary found in PATH: %w", err)
+		}
 	}
 
-	// Initialize validator configuration using evmosd testnet init-files
+	fmt.Printf("Using binary: %s (path: %s)\n", binaryName, binaryPath)
+
+	// Initialize validator configuration using testnet init-files
 	args := []string{
 		"testnet",
 		"init-files",
@@ -90,15 +98,17 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		"--keyring-backend", "test",
 	}
 
-	cmd := exec.Command(evmosdPath, args...)
+	cmd := exec.Command(binaryPath, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to initialize validator configs: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("failed to initialize validator configs with %s: %w\nOutput: %s", binaryName, err, string(output))
 	}
 
 	// Set up validator process info
+	// The daemon home directory name depends on the binary (evmosd or xcoind)
+	daemonHome := binaryName
 	for i := 0; i < numValidators; i++ {
-		nodeDir := filepath.Join(pn.baseDir, fmt.Sprintf("node%d", i), "evmosd")
+		nodeDir := filepath.Join(pn.baseDir, fmt.Sprintf("node%d", i), daemonHome)
 
 		validator := &ValidatorProcess{
 			Index:       i,
@@ -118,15 +128,23 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 
 // startValidators starts each validator in its own process
 func (pn *ProductionNetwork) startValidators() error {
-	// Find evmosd binary
-	evmosdPath, err := exec.LookPath("evmosd")
+	// Try to find xcoind binary first, fallback to evmosd
+	binaryName := "xcoind"
+	binaryPath, err := exec.LookPath(binaryName)
 	if err != nil {
-		return fmt.Errorf("evmosd binary not found in PATH: %w", err)
+		// Try evmosd as fallback
+		binaryName = "evmosd"
+		binaryPath, err = exec.LookPath(binaryName)
+		if err != nil {
+			return fmt.Errorf("neither xcoind nor evmosd binary found in PATH: %w", err)
+		}
 	}
+
+	fmt.Printf("Starting validators with binary: %s\n", binaryName)
 
 	for _, val := range pn.validators {
 		// Create log file
-		logPath := filepath.Join(val.NodeDir, "evmosd.log")
+		logPath := filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", binaryName))
 		logFile, err := os.Create(logPath)
 		if err != nil {
 			return fmt.Errorf("failed to create log file for validator %d: %w", val.Index, err)
@@ -146,7 +164,7 @@ func (pn *ProductionNetwork) startValidators() error {
 		}
 
 		// Create command
-		cmd := exec.Command(evmosdPath, args...)
+		cmd := exec.Command(binaryPath, args...)
 		cmd.Dir = val.NodeDir
 		cmd.Stdout = logFile
 		cmd.Stderr = logFile
@@ -155,10 +173,12 @@ func (pn *ProductionNetwork) startValidators() error {
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 		// Start the validator process
+		fmt.Printf("Starting validator %d: %s %v\n", val.Index, binaryPath, args)
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("failed to start validator %d: %w", val.Index, err)
 		}
 
+		fmt.Printf("Validator %d started with PID %d\n", val.Index, cmd.Process.Pid)
 		val.Cmd = cmd
 	}
 
