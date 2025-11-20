@@ -24,6 +24,7 @@ import (
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	sdktestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -302,6 +303,12 @@ func (n *IntegrationNetwork) GetOtherDenoms() []string {
 // GetValidators returns the network's validators
 func (n *IntegrationNetwork) GetValidators() []stakingtypes.Validator {
 	return n.validators
+}
+
+// GetBankKeeper returns the bank keeper from the app.
+// This is used for testing purposes to directly interact with the bank module.
+func (n *IntegrationNetwork) GetBankKeeper() bankkeeper.Keeper {
+	return n.app.BankKeeper
 }
 
 // GetOtherDenoms returns network's other supported denoms

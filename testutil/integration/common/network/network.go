@@ -13,6 +13,7 @@ import (
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -29,6 +30,7 @@ type Network interface {
 	GetBaseDenom() string
 	GetOtherDenoms() []string
 	GetValidators() []stakingtypes.Validator
+	GetBankKeeper() bankkeeper.Keeper
 
 	NextBlock() error
 	NextBlockAfter(duration time.Duration) error
