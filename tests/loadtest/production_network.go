@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -72,8 +73,32 @@ func NewProductionNetwork(numValidators int) (*ProductionNetwork, error) {
 
 // initValidatorConfigs initializes configuration for each validator
 func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
+	// Use evmosd testnet init-files to create validator configurations
+	evmosdPath, err := exec.LookPath("evmosd")
+	if err != nil {
+		return fmt.Errorf("evmosd binary not found in PATH: %w", err)
+	}
+
+	// Initialize validator configuration using evmosd testnet init-files
+	args := []string{
+		"testnet",
+		"init-files",
+		"--v", fmt.Sprintf("%d", numValidators),
+		"--output-dir", pn.baseDir,
+		"--starting-ip-address", "127.0.0.1",
+		"--chain-id", "evmos_9002-1",
+		"--keyring-backend", "test",
+	}
+
+	cmd := exec.Command(evmosdPath, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to initialize validator configs: %w\nOutput: %s", err, string(output))
+	}
+
+	// Set up validator process info
 	for i := 0; i < numValidators; i++ {
-		nodeDir := filepath.Join(pn.baseDir, fmt.Sprintf("node%d", i))
+		nodeDir := filepath.Join(pn.baseDir, fmt.Sprintf("node%d", i), "evmosd")
 
 		validator := &ValidatorProcess{
 			Index:       i,
@@ -86,15 +111,6 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		}
 
 		pn.validators[i] = validator
-
-		// Create node directory
-		if err := os.MkdirAll(nodeDir, 0755); err != nil {
-			return fmt.Errorf("failed to create node dir %s: %w", nodeDir, err)
-		}
-
-		// Initialize node using evmosd init
-		// This would normally be done via evmosd testnet init-files
-		// For now, we'll document that this requires proper initialization
 	}
 
 	return nil
@@ -152,9 +168,11 @@ func (pn *ProductionNetwork) startValidators() error {
 // waitForNetwork waits for all validators to be ready
 func (pn *ProductionNetwork) waitForNetwork() error {
 	// Wait for RPC endpoints to become available
-	timeout := time.After(30 * time.Second)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	timeout := time.After(60 * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	fmt.Println("Waiting for all validators to start...")
 
 	for {
 		select {
@@ -162,23 +180,36 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 			return fmt.Errorf("timeout waiting for validators to start")
 		case <-ticker.C:
 			allReady := true
+			readyCount := 0
+
 			for _, val := range pn.validators {
 				// Check if validator process is still running
 				if val.Cmd.ProcessState != nil && val.Cmd.ProcessState.Exited() {
 					return fmt.Errorf("validator %d exited prematurely", val.Index)
 				}
 
-				// Try to connect to RPC endpoint
-				// This is simplified - in production you'd use proper RPC client
-				rpcAddr := fmt.Sprintf("http://localhost:%d", val.RPCPort)
-				_ = rpcAddr // Use the address to check connectivity
-
-				// For now, just check if process is running
-				// In full implementation, would check RPC /status endpoint
+				// Check if port is listening using ss command
+				cmd := exec.Command("ss", "-tln")
+				output, err := cmd.CombinedOutput()
+				if err == nil {
+					portStr := fmt.Sprintf(":%d", val.RPCPort)
+					if strings.Contains(string(output), portStr) {
+						readyCount++
+					} else {
+						allReady = false
+					}
+				} else {
+					allReady = false
+				}
 			}
 
-			if allReady {
+			if allReady && readyCount == len(pn.validators) {
+				fmt.Printf("All %d validators are ready!\n", readyCount)
 				return nil
+			}
+
+			if readyCount > 0 {
+				fmt.Printf("Validators ready: %d/%d\n", readyCount, len(pn.validators))
 			}
 		}
 	}

@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os/exec"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -84,6 +86,140 @@ type NodeStats struct {
 
 func TestMultiNodeLoadTest(t *testing.T) {
 	suite.Run(t, new(MultiNodeLoadTestSuite))
+}
+
+// TestLocalNodesStart tests starting 4 validators in separate processes
+// This test initializes and starts actual validator nodes on different ports
+func TestLocalNodesStart(t *testing.T) {
+	t.Log("\n╔════════════════════════════════════════════════════════╗")
+	t.Log("║  Local Nodes Start Test (4 Validators)                ║")
+	t.Log("╚════════════════════════════════════════════════════════╝\n")
+
+	// Initialize production network with 4 validators
+	prodNet, err := NewProductionNetwork(4)
+	if err != nil {
+		t.Fatalf("Failed to create production network: %v", err)
+	}
+	defer prodNet.Cleanup()
+
+	// Print validator information
+	t.Log(prodNet.PrintValidatorInfo())
+
+	// Wait a bit for validators to fully start
+	t.Log("Waiting for validators to stabilize...")
+	time.Sleep(5 * time.Second)
+
+	// Verify ports are listening using ss -t command
+	t.Log("\n╔════════════════════════════════════════════════════════╗")
+	t.Log("║  Verifying Node Ports with ss -t                      ║")
+	t.Log("╚════════════════════════════════════════════════════════╝\n")
+
+	printSocketStatus(t, prodNet)
+
+	// Keep validators running for a bit to observe
+	t.Log("\nValidators are running. Keeping them alive for 10 seconds...")
+	time.Sleep(10 * time.Second)
+
+	t.Log("\n✓ Local nodes test completed successfully")
+}
+
+// printSocketStatus prints socket status using ss -t command
+func printSocketStatus(t *testing.T, prodNet *ProductionNetwork) {
+	// Expected ports for 4 validators
+	expectedPorts := []struct {
+		port     int
+		portType string
+	}{
+		{26657, "RPC"},
+		{26667, "RPC"},
+		{26677, "RPC"},
+		{26687, "RPC"},
+		{26656, "P2P"},
+		{26666, "P2P"},
+		{26676, "P2P"},
+		{26686, "P2P"},
+		{9090, "gRPC"},
+		{9100, "gRPC"},
+		{9110, "gRPC"},
+		{9120, "gRPC"},
+		{1317, "API"},
+		{1327, "API"},
+		{1337, "API"},
+		{1347, "API"},
+		{8545, "JSON-RPC"},
+		{8555, "JSON-RPC"},
+		{8565, "JSON-RPC"},
+		{8575, "JSON-RPC"},
+	}
+
+	t.Log("Checking listening sockets with ss -t:")
+	t.Log("┌──────────┬──────────┬────────────────────────────────────┐")
+	t.Log("│ Port     │ Type     │ Status                             │")
+	t.Log("├──────────┼──────────┼────────────────────────────────────┤")
+
+	// Run ss -tln to get listening TCP sockets
+	cmd := exec.Command("ss", "-tln")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Logf("⚠ Warning: ss command failed: %v", err)
+		t.Logf("Output: %s", string(output))
+	} else {
+		outputStr := string(output)
+
+		// Check each expected port
+		for _, ep := range expectedPorts {
+			portStr := fmt.Sprintf(":%d", ep.port)
+			status := "❌ Not listening"
+			if strings.Contains(outputStr, portStr) {
+				status = "✓ Listening"
+			}
+
+			t.Logf("│ %-8d │ %-8s │ %-34s │", ep.port, ep.portType, status)
+		}
+	}
+
+	t.Log("└──────────┴──────────┴────────────────────────────────────┘")
+	t.Log("")
+
+	// Print full ss -t output
+	t.Log("Full ss -t output (listening TCP sockets):")
+	t.Log("─────────────────────────────────────────────────────────")
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if line != "" {
+				t.Logf("  %s", line)
+			}
+		}
+	}
+	t.Log("─────────────────────────────────────────────────────────")
+	t.Log("")
+
+	// Also check established connections
+	t.Log("Checking established TCP connections with ss -t:")
+	cmdEstab := exec.Command("ss", "-t", "state", "established")
+	outputEstab, errEstab := cmdEstab.CombinedOutput()
+	if errEstab != nil {
+		t.Logf("⚠ Warning: ss established command failed: %v", errEstab)
+	} else {
+		t.Log("─────────────────────────────────────────────────────────")
+		linesEstab := strings.Split(string(outputEstab), "\n")
+		establishedCount := 0
+		for _, line := range linesEstab {
+			if line != "" && !strings.HasPrefix(line, "State") {
+				// Check if line contains any of our ports
+				for _, ep := range expectedPorts {
+					if strings.Contains(line, fmt.Sprintf(":%d", ep.port)) {
+						t.Logf("  %s", line)
+						establishedCount++
+						break
+					}
+				}
+			}
+		}
+		t.Log("─────────────────────────────────────────────────────────")
+		t.Logf("Found %d established connections on validator ports\n", establishedCount)
+	}
 }
 
 // SetupSuite initializes the multi-node test environment
