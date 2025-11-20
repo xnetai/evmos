@@ -247,8 +247,8 @@ func (pn *ProductionNetwork) startValidators() error {
 // waitForNetwork waits for all validators to be ready
 func (pn *ProductionNetwork) waitForNetwork() error {
 	// Wait for RPC endpoints to become available
-	timeout := time.After(60 * time.Second)
-	ticker := time.NewTicker(1 * time.Second)
+	timeout := time.After(120 * time.Second) // Increased timeout to 120 seconds
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	fmt.Println("Waiting for all validators to start...")
@@ -256,6 +256,34 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 	for {
 		select {
 		case <-timeout:
+			// Print diagnostic information before returning error
+			fmt.Println("\n=== Timeout Diagnostics ===")
+			for _, val := range pn.validators {
+				fmt.Printf("\nValidator %d (PID %d):\n", val.Index, val.Cmd.Process.Pid)
+
+				// Check process state
+				if val.Cmd.ProcessState != nil && val.Cmd.ProcessState.Exited() {
+					fmt.Printf("  Status: EXITED (exit code: %d)\n", val.Cmd.ProcessState.ExitCode())
+				} else {
+					fmt.Printf("  Status: RUNNING\n")
+				}
+
+				// Print last 50 lines of log
+				fmt.Printf("  Log file: %s\n", filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", pn.binaryName)))
+				if logContent, err := os.ReadFile(filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", pn.binaryName))); err == nil {
+					lines := strings.Split(string(logContent), "\n")
+					startIdx := len(lines) - 51
+					if startIdx < 0 {
+						startIdx = 0
+					}
+					fmt.Printf("  Last log lines:\n")
+					for _, line := range lines[startIdx:] {
+						if line != "" {
+							fmt.Printf("    %s\n", line)
+						}
+					}
+				}
+			}
 			return fmt.Errorf("timeout waiting for validators to start")
 		case <-ticker.C:
 			allReady := true
@@ -264,6 +292,20 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 			for _, val := range pn.validators {
 				// Check if validator process is still running
 				if val.Cmd.ProcessState != nil && val.Cmd.ProcessState.Exited() {
+					// Print log tail before returning error
+					fmt.Printf("\nValidator %d exited prematurely. Last log lines:\n", val.Index)
+					if logContent, err := os.ReadFile(filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", pn.binaryName))); err == nil {
+						lines := strings.Split(string(logContent), "\n")
+						startIdx := len(lines) - 31
+						if startIdx < 0 {
+							startIdx = 0
+						}
+						for _, line := range lines[startIdx:] {
+							if line != "" {
+								fmt.Printf("  %s\n", line)
+							}
+						}
+					}
 					return fmt.Errorf("validator %d exited prematurely", val.Index)
 				}
 
