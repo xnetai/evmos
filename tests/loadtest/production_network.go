@@ -22,6 +22,8 @@ type ProductionNetwork struct {
 	validators []*ValidatorProcess
 	network    network.Network // Underlying integration network for setup
 	mutex      sync.Mutex
+	binaryPath string          // Cached path to the binary
+	binaryName string          // Name of the binary (xcoind or evmosd)
 }
 
 // ValidatorProcess represents a single validator running in its own process
@@ -37,6 +39,78 @@ type ValidatorProcess struct {
 	LogFile    *os.File
 }
 
+// findOrBuildBinary attempts to find xcoind or evmosd binary, building if necessary
+func findOrBuildBinary() (binaryPath, binaryName string, err error) {
+	// Try to find xcoind binary first
+	binaryName = "xcoind"
+	binaryPath, err = exec.LookPath(binaryName)
+	if err == nil {
+		fmt.Printf("Found %s in PATH: %s\n", binaryName, binaryPath)
+		return binaryPath, binaryName, nil
+	}
+
+	// Try evmosd as fallback
+	binaryName = "evmosd"
+	binaryPath, err = exec.LookPath(binaryName)
+	if err == nil {
+		fmt.Printf("Found %s in PATH: %s\n", binaryName, binaryPath)
+		return binaryPath, binaryName, nil
+	}
+
+	// Neither binary found, attempt to build from source
+	fmt.Println("Neither xcoind nor evmosd found in PATH, attempting to build from source...")
+
+	// Find the evmos root directory
+	// We're in tests/loadtest, so go up two levels
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Try to find evmos root by looking for go.mod
+	evmosRoot := currentDir
+	for i := 0; i < 5; i++ { // Try up to 5 levels up
+		if _, err := os.Stat(filepath.Join(evmosRoot, "go.mod")); err == nil {
+			break
+		}
+		evmosRoot = filepath.Dir(evmosRoot)
+	}
+
+	fmt.Printf("Building binary in directory: %s\n", evmosRoot)
+
+	// Run make build
+	buildCmd := exec.Command("make", "build")
+	buildCmd.Dir = evmosRoot
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+
+	fmt.Println("Running: make build")
+	if err := buildCmd.Run(); err != nil {
+		return "", "", fmt.Errorf("failed to build binary: %w", err)
+	}
+
+	// Check for built binaries in build/ directory
+	buildDir := filepath.Join(evmosRoot, "build")
+
+	// Try xcoind first
+	binaryName = "xcoind"
+	binaryPath = filepath.Join(buildDir, binaryName)
+	if _, err := os.Stat(binaryPath); err == nil {
+		fmt.Printf("Successfully built %s: %s\n", binaryName, binaryPath)
+		return binaryPath, binaryName, nil
+	}
+
+	// Try evmosd
+	binaryName = "evmosd"
+	binaryPath = filepath.Join(buildDir, binaryName)
+	if _, err := os.Stat(binaryPath); err == nil {
+		fmt.Printf("Successfully built %s: %s\n", binaryName, binaryPath)
+		return binaryPath, binaryName, nil
+	}
+
+	return "", "", fmt.Errorf("build completed but could not find binary in %s", buildDir)
+}
+
 // NewProductionNetwork creates a network with separate validator processes
 func NewProductionNetwork(numValidators int) (*ProductionNetwork, error) {
 	// Create temporary directory for validator nodes
@@ -45,9 +119,18 @@ func NewProductionNetwork(numValidators int) (*ProductionNetwork, error) {
 		return nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
+	// Find or build the binary
+	binaryPath, binaryName, err := findOrBuildBinary()
+	if err != nil {
+		os.RemoveAll(baseDir)
+		return nil, err
+	}
+
 	pn := &ProductionNetwork{
 		baseDir:    baseDir,
 		validators: make([]*ValidatorProcess, numValidators),
+		binaryPath: binaryPath,
+		binaryName: binaryName,
 	}
 
 	// Initialize validator configuration files
@@ -73,19 +156,7 @@ func NewProductionNetwork(numValidators int) (*ProductionNetwork, error) {
 
 // initValidatorConfigs initializes configuration for each validator
 func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
-	// Try to find xcoind binary first, fallback to evmosd
-	binaryName := "xcoind"
-	binaryPath, err := exec.LookPath(binaryName)
-	if err != nil {
-		// Try evmosd as fallback
-		binaryName = "evmosd"
-		binaryPath, err = exec.LookPath(binaryName)
-		if err != nil {
-			return fmt.Errorf("neither xcoind nor evmosd binary found in PATH: %w", err)
-		}
-	}
-
-	fmt.Printf("Using binary: %s (path: %s)\n", binaryName, binaryPath)
+	fmt.Printf("Initializing validator configs with %s (path: %s)\n", pn.binaryName, pn.binaryPath)
 
 	// Initialize validator configuration using testnet init-files
 	args := []string{
@@ -98,15 +169,15 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		"--keyring-backend", "test",
 	}
 
-	cmd := exec.Command(binaryPath, args...)
+	cmd := exec.Command(pn.binaryPath, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to initialize validator configs with %s: %w\nOutput: %s", binaryName, err, string(output))
+		return fmt.Errorf("failed to initialize validator configs with %s: %w\nOutput: %s", pn.binaryName, err, string(output))
 	}
 
 	// Set up validator process info
 	// The daemon home directory name depends on the binary (evmosd or xcoind)
-	daemonHome := binaryName
+	daemonHome := pn.binaryName
 	for i := 0; i < numValidators; i++ {
 		nodeDir := filepath.Join(pn.baseDir, fmt.Sprintf("node%d", i), daemonHome)
 
@@ -128,23 +199,11 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 
 // startValidators starts each validator in its own process
 func (pn *ProductionNetwork) startValidators() error {
-	// Try to find xcoind binary first, fallback to evmosd
-	binaryName := "xcoind"
-	binaryPath, err := exec.LookPath(binaryName)
-	if err != nil {
-		// Try evmosd as fallback
-		binaryName = "evmosd"
-		binaryPath, err = exec.LookPath(binaryName)
-		if err != nil {
-			return fmt.Errorf("neither xcoind nor evmosd binary found in PATH: %w", err)
-		}
-	}
-
-	fmt.Printf("Starting validators with binary: %s\n", binaryName)
+	fmt.Printf("Starting validators with binary: %s (path: %s)\n", pn.binaryName, pn.binaryPath)
 
 	for _, val := range pn.validators {
 		// Create log file
-		logPath := filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", binaryName))
+		logPath := filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", pn.binaryName))
 		logFile, err := os.Create(logPath)
 		if err != nil {
 			return fmt.Errorf("failed to create log file for validator %d: %w", val.Index, err)
@@ -164,7 +223,7 @@ func (pn *ProductionNetwork) startValidators() error {
 		}
 
 		// Create command
-		cmd := exec.Command(binaryPath, args...)
+		cmd := exec.Command(pn.binaryPath, args...)
 		cmd.Dir = val.NodeDir
 		cmd.Stdout = logFile
 		cmd.Stderr = logFile
@@ -173,7 +232,7 @@ func (pn *ProductionNetwork) startValidators() error {
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 		// Start the validator process
-		fmt.Printf("Starting validator %d: %s %v\n", val.Index, binaryPath, args)
+		fmt.Printf("Starting validator %d: %s %v\n", val.Index, pn.binaryPath, args)
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("failed to start validator %d: %w", val.Index, err)
 		}
