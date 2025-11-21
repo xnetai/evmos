@@ -214,6 +214,7 @@ func (pn *ProductionNetwork) startValidators() error {
 		args := []string{
 			"start",
 			"--home", val.NodeDir,
+			"--chain-id", "evmos_9002-1",
 			"--rpc.laddr", fmt.Sprintf("tcp://0.0.0.0:%d", val.RPCPort),
 			"--p2p.laddr", fmt.Sprintf("tcp://0.0.0.0:%d", val.P2PPort),
 			"--grpc.address", fmt.Sprintf("0.0.0.0:%d", val.GRPCPort),
