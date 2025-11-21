@@ -219,7 +219,7 @@ func (pn *ProductionNetwork) startValidators() error {
 			"--grpc.address", fmt.Sprintf("0.0.0.0:%d", val.GRPCPort),
 			"--json-rpc.address", fmt.Sprintf("0.0.0.0:%d", val.JSONRPCPort),
 			"--json-rpc.ws-address", fmt.Sprintf("0.0.0.0:%d", val.JSONRPCPort+1),
-			"--minimum-gas-prices", "0aevmos",
+			"--minimum-gas-prices", "0txcoin", // Use txcoin for testing chain (evmos_9002-1)
 		}
 
 		// Create command
