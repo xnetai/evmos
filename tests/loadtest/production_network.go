@@ -217,9 +217,9 @@ func (pn *ProductionNetwork) startValidators() error {
 			"--rpc.laddr", fmt.Sprintf("tcp://0.0.0.0:%d", val.RPCPort),
 			"--p2p.laddr", fmt.Sprintf("tcp://0.0.0.0:%d", val.P2PPort),
 			"--grpc.address", fmt.Sprintf("0.0.0.0:%d", val.GRPCPort),
-			"--api.address", fmt.Sprintf("tcp://0.0.0.0:%d", val.APIPort),
 			"--json-rpc.address", fmt.Sprintf("0.0.0.0:%d", val.JSONRPCPort),
 			"--json-rpc.ws-address", fmt.Sprintf("0.0.0.0:%d", val.JSONRPCPort+1),
+			"--minimum-gas-prices", "0aevmos",
 		}
 
 		// Create command
