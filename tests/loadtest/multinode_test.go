@@ -95,6 +95,7 @@ func TestLocalNodesStart(t *testing.T) {
 	t.Log("║  Local Nodes Start Test (4 Validators)                ║")
 	t.Log("╚════════════════════════════════════════════════════════╝\n")
 
+	//
 	// Initialize production network with 4 validators
 	prodNet, err := NewProductionNetwork(4)
 	if err != nil {
