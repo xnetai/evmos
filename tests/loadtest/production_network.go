@@ -250,6 +250,7 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		lines := strings.Split(configStr, "\n")
 		persistentPeersReplaced := false
 		addrBookStrictReplaced := false
+		allowDuplicateIPReplaced := false
 
 		for idx, line := range lines {
 			trimmed := strings.TrimSpace(line)
@@ -269,6 +270,14 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 				fmt.Printf("Validator %d: Replacing '%s' with 'addr_book_strict = false' (allow localhost)\n", i, strings.TrimSpace(oldValue))
 				addrBookStrictReplaced = true
 			}
+
+			// Set allow_duplicate_ip = true to allow multiple peers from same IP
+			if strings.HasPrefix(trimmed, "allow_duplicate_ip = ") && !strings.HasPrefix(trimmed, "#") && !allowDuplicateIPReplaced {
+				oldValue := line
+				lines[idx] = `allow_duplicate_ip = true`
+				fmt.Printf("Validator %d: Replacing '%s' with 'allow_duplicate_ip = true' (allow multiple peers from 127.0.0.1)\n", i, strings.TrimSpace(oldValue))
+				allowDuplicateIPReplaced = true
+			}
 		}
 
 		if !persistentPeersReplaced {
@@ -277,6 +286,10 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 
 		if !addrBookStrictReplaced {
 			return fmt.Errorf("failed to find addr_book_strict line in config.toml for validator %d", i)
+		}
+
+		if !allowDuplicateIPReplaced {
+			return fmt.Errorf("failed to find allow_duplicate_ip line in config.toml for validator %d", i)
 		}
 
 		configStr = strings.Join(lines, "\n")
