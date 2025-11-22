@@ -211,6 +211,12 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		if err := json.Unmarshal(nodeKeyData, &nodeKey); err != nil {
 			return fmt.Errorf("failed to parse node_key.json for validator %d: %w", i, err)
 		}
+
+		// Validate node ID is not empty
+		if nodeKey.ID == "" {
+			return fmt.Errorf("node ID is empty for validator %d, node_key.json content: %s", i, string(nodeKeyData))
+		}
+
 		nodeIDs[i] = nodeKey.ID
 		fmt.Printf("Validator %d node ID: %s\n", i, nodeKey.ID)
 	}
@@ -223,11 +229,20 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		var peers []string
 		for j := 0; j < numValidators; j++ {
 			if j != i {
+				// Double-check node ID is not empty before adding to peers
+				if nodeIDs[j] == "" {
+					return fmt.Errorf("cannot build persistent_peers: node ID for validator %d is empty", j)
+				}
 				peerAddr := fmt.Sprintf("%s@127.0.0.1:%d", nodeIDs[j], 26656+(j*10))
 				peers = append(peers, peerAddr)
 			}
 		}
 		persistentPeers := strings.Join(peers, ",")
+
+		// Validate persistent_peers is not empty
+		if persistentPeers == "" && numValidators > 1 {
+			return fmt.Errorf("persistent_peers is empty for validator %d, but we have %d validators", i, numValidators)
+		}
 
 		// Read config file
 		configData, err := os.ReadFile(configPath)
