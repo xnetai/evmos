@@ -204,12 +204,22 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 			return fmt.Errorf("failed to get node ID for validator %d: %w\nOutput: %s", i, err, string(nodeIDOutput))
 		}
 
-		// Trim whitespace from output
+		// Trim all whitespace including newlines, carriage returns, etc.
 		nodeID := strings.TrimSpace(string(nodeIDOutput))
+		// Also remove any non-printable characters
+		nodeID = strings.Map(func(r rune) rune {
+			if r == '\n' || r == '\r' || r == '\t' {
+				return -1 // Remove these characters
+			}
+			return r
+		}, nodeID)
 
-		// Validate node ID is not empty
+		// Validate node ID is not empty and contains only valid characters
 		if nodeID == "" {
 			return fmt.Errorf("node ID is empty for validator %d", i)
+		}
+		if len(nodeID) != 40 { // CometBFT node IDs are 40 hex characters
+			return fmt.Errorf("node ID for validator %d has invalid length %d (expected 40): %s", i, len(nodeID), nodeID)
 		}
 
 		nodeIDs[i] = nodeID
@@ -233,6 +243,11 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 			}
 		}
 		persistentPeers := strings.Join(peers, ",")
+
+		// Validate persistent_peers doesn't contain newlines or other problematic characters
+		if strings.ContainsAny(persistentPeers, "\n\r") {
+			return fmt.Errorf("persistent_peers contains newline characters for validator %d: %q", i, persistentPeers)
+		}
 
 		// Validate persistent_peers is not empty
 		if persistentPeers == "" && numValidators > 1 {
