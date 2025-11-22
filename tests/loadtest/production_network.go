@@ -39,6 +39,16 @@ type ValidatorProcess struct {
 	LogFile    *os.File
 }
 
+// isHexString checks if a string contains only hexadecimal characters
+func isHexString(s string) bool {
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
 // findOrBuildBinary attempts to find xcoind or evmosd binary, building if necessary
 func findOrBuildBinary() (binaryPath, binaryName string, err error) {
 	// Try to find xcoind binary first
@@ -204,22 +214,27 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 			return fmt.Errorf("failed to get node ID for validator %d: %w\nOutput: %s", i, err, string(nodeIDOutput))
 		}
 
-		// Trim all whitespace including newlines, carriage returns, etc.
-		nodeID := strings.TrimSpace(string(nodeIDOutput))
-		// Also remove any non-printable characters
-		nodeID = strings.Map(func(r rune) rune {
-			if r == '\n' || r == '\r' || r == '\t' {
-				return -1 // Remove these characters
+		// Parse output to extract node ID (40 hex characters)
+		// The command may output warnings or other messages, so we need to find the actual node ID
+		var nodeID string
+		outputLines := strings.Split(string(nodeIDOutput), "\n")
+		for _, line := range outputLines {
+			line = strings.TrimSpace(line)
+			// Skip empty lines and lines that start with WARNING, INFO, ERROR, etc.
+			if line == "" || strings.HasPrefix(line, "WARNING") || strings.HasPrefix(line, "WARN") ||
+			   strings.HasPrefix(line, "INFO") || strings.HasPrefix(line, "ERROR") {
+				continue
 			}
-			return r
-		}, nodeID)
-
-		// Validate node ID is not empty and contains only valid characters
-		if nodeID == "" {
-			return fmt.Errorf("node ID is empty for validator %d", i)
+			// Node ID should be exactly 40 hex characters
+			if len(line) == 40 && isHexString(line) {
+				nodeID = line
+				break
+			}
 		}
-		if len(nodeID) != 40 { // CometBFT node IDs are 40 hex characters
-			return fmt.Errorf("node ID for validator %d has invalid length %d (expected 40): %s", i, len(nodeID), nodeID)
+
+		// Validate node ID was found
+		if nodeID == "" {
+			return fmt.Errorf("could not find valid node ID in output for validator %d\nOutput: %s", i, string(nodeIDOutput))
 		}
 
 		nodeIDs[i] = nodeID
