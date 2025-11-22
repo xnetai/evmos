@@ -4,7 +4,6 @@
 package loadtest
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -197,28 +196,24 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 
 		pn.validators[i] = validator
 
-		// Read node ID from node_key.json
-		nodeKeyPath := filepath.Join(nodeDir, "config", "node_key.json")
-		nodeKeyData, err := os.ReadFile(nodeKeyPath)
+		// Get node ID using the binary's show-node-id command
+		// This is more reliable than parsing node_key.json
+		showNodeIDCmd := exec.Command(pn.binaryPath, "tendermint", "show-node-id", "--home", nodeDir)
+		nodeIDOutput, err := showNodeIDCmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("failed to read node_key.json for validator %d: %w", i, err)
+			return fmt.Errorf("failed to get node ID for validator %d: %w\nOutput: %s", i, err, string(nodeIDOutput))
 		}
 
-		// Parse node ID from JSON
-		var nodeKey struct {
-			ID string `json:"id"`
-		}
-		if err := json.Unmarshal(nodeKeyData, &nodeKey); err != nil {
-			return fmt.Errorf("failed to parse node_key.json for validator %d: %w", i, err)
-		}
+		// Trim whitespace from output
+		nodeID := strings.TrimSpace(string(nodeIDOutput))
 
 		// Validate node ID is not empty
-		if nodeKey.ID == "" {
-			return fmt.Errorf("node ID is empty for validator %d, node_key.json content: %s", i, string(nodeKeyData))
+		if nodeID == "" {
+			return fmt.Errorf("node ID is empty for validator %d", i)
 		}
 
-		nodeIDs[i] = nodeKey.ID
-		fmt.Printf("Validator %d node ID: %s\n", i, nodeKey.ID)
+		nodeIDs[i] = nodeID
+		fmt.Printf("Validator %d node ID: %s\n", i, nodeID)
 	}
 
 	// Second pass: update config.toml with correct persistent_peers
