@@ -377,6 +377,16 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 					fmt.Printf("  Status: RUNNING\n")
 				}
 
+				// Check if port is listening
+				cmd := exec.Command("ss", "-tln")
+				output, err := cmd.CombinedOutput()
+				portStr := fmt.Sprintf(":%d", val.RPCPort)
+				if err == nil && strings.Contains(string(output), portStr) {
+					fmt.Printf("  RPC Port %d: LISTENING\n", val.RPCPort)
+				} else {
+					fmt.Printf("  RPC Port %d: NOT DETECTED (ss error: %v)\n", val.RPCPort, err)
+				}
+
 				// Print last 50 lines of log
 				fmt.Printf("  Log file: %s\n", filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", pn.binaryName)))
 				if logContent, err := os.ReadFile(filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", pn.binaryName))); err == nil {
@@ -418,7 +428,21 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 					return fmt.Errorf("validator %d exited prematurely", val.Index)
 				}
 
-				// Check if port is listening using ss command
+				// Check if validator is producing blocks by looking at log
+				// If we see "indexed block" or "committed state" in recent logs, validator is ready
+				logPath := filepath.Join(val.NodeDir, fmt.Sprintf("%s.log", pn.binaryName))
+				if logContent, err := os.ReadFile(logPath); err == nil {
+					logStr := string(logContent)
+					// Check for signs of active consensus/block production
+					if strings.Contains(logStr, "indexed block") ||
+					   strings.Contains(logStr, "committed state") ||
+					   strings.Contains(logStr, "Finalizing commit") {
+						readyCount++
+						continue
+					}
+				}
+
+				// Fallback: Check if port is listening using ss command
 				cmd := exec.Command("ss", "-tln")
 				output, err := cmd.CombinedOutput()
 				if err == nil {
@@ -439,7 +463,7 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 			}
 
 			if readyCount > 0 {
-				fmt.Printf("Validators ready: %d/%d\n", readyCount, len(pn.validators))
+				fmt.Printf("Validators ready: %d/%d (checking block production and RPC ports)\n", readyCount, len(pn.validators))
 			}
 		}
 	}
