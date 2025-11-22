@@ -245,24 +245,38 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 			return fmt.Errorf("failed to read config.toml for validator %d: %w", i, err)
 		}
 
-		// Replace persistent_peers line
+		// Replace persistent_peers line and set addr_book_strict = false
 		configStr := string(configData)
 		lines := strings.Split(configStr, "\n")
-		replaced := false
+		persistentPeersReplaced := false
+		addrBookStrictReplaced := false
+
 		for idx, line := range lines {
 			trimmed := strings.TrimSpace(line)
-			// Match persistent_peers = "..." or persistent_peers = '...' or persistent_peers = ""
-			if strings.HasPrefix(trimmed, "persistent_peers = ") && !strings.HasPrefix(trimmed, "#") {
+
+			// Replace persistent_peers
+			if strings.HasPrefix(trimmed, "persistent_peers = ") && !strings.HasPrefix(trimmed, "#") && !persistentPeersReplaced {
 				oldValue := line
 				lines[idx] = fmt.Sprintf(`persistent_peers = "%s"`, persistentPeers)
 				fmt.Printf("Validator %d: Replacing '%s' with 'persistent_peers = \"%s\"'\n", i, strings.TrimSpace(oldValue), persistentPeers)
-				replaced = true
-				break
+				persistentPeersReplaced = true
+			}
+
+			// Set addr_book_strict = false to allow localhost addresses
+			if strings.HasPrefix(trimmed, "addr_book_strict = ") && !strings.HasPrefix(trimmed, "#") && !addrBookStrictReplaced {
+				oldValue := line
+				lines[idx] = `addr_book_strict = false`
+				fmt.Printf("Validator %d: Replacing '%s' with 'addr_book_strict = false' (allow localhost)\n", i, strings.TrimSpace(oldValue))
+				addrBookStrictReplaced = true
 			}
 		}
 
-		if !replaced {
+		if !persistentPeersReplaced {
 			return fmt.Errorf("failed to find persistent_peers line in config.toml for validator %d", i)
+		}
+
+		if !addrBookStrictReplaced {
+			return fmt.Errorf("failed to find addr_book_strict line in config.toml for validator %d", i)
 		}
 
 		configStr = strings.Join(lines, "\n")
