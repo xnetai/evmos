@@ -253,12 +253,23 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		// Replace persistent_peers line
 		configStr := string(configData)
 		lines := strings.Split(configStr, "\n")
+		replaced := false
 		for idx, line := range lines {
-			if strings.HasPrefix(strings.TrimSpace(line), "persistent_peers = ") {
+			trimmed := strings.TrimSpace(line)
+			// Match persistent_peers = "..." or persistent_peers = '...' or persistent_peers = ""
+			if strings.HasPrefix(trimmed, "persistent_peers = ") && !strings.HasPrefix(trimmed, "#") {
+				oldValue := line
 				lines[idx] = fmt.Sprintf(`persistent_peers = "%s"`, persistentPeers)
+				fmt.Printf("Validator %d: Replacing '%s' with 'persistent_peers = \"%s\"'\n", i, strings.TrimSpace(oldValue), persistentPeers)
+				replaced = true
 				break
 			}
 		}
+
+		if !replaced {
+			return fmt.Errorf("failed to find persistent_peers line in config.toml for validator %d", i)
+		}
+
 		configStr = strings.Join(lines, "\n")
 
 		// Write back config file
@@ -266,7 +277,7 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 			return fmt.Errorf("failed to write config.toml for validator %d: %w", i, err)
 		}
 
-		fmt.Printf("Validator %d persistent_peers: %s\n", i, persistentPeers)
+		fmt.Printf("Validator %d persistent_peers successfully updated\n", i)
 	}
 
 	return nil
