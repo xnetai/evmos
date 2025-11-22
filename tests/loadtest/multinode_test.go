@@ -1917,7 +1917,7 @@ func queryProductionBalances(t *testing.T, prodNet *ProductionNetwork, blockStat
 	}
 
 	// Operator balances (validators)
-	for i, val := range prodNet.validators {
+	for i := range prodNet.validators {
 		operatorAddr := fmt.Sprintf("evmosvaloper1operator%d", i+1)
 		blockStats.OperatorBalances[operatorAddr] = baseAmount.Mul(sdkmath.NewInt(10)).Add(blockAdjustment)
 	}
