@@ -13,11 +13,11 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	"github.com/evmos/evmos/v20/x/erc20/types"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	"github.com/evmos/xcoin/v20/x/erc20/types"
 )
 
 type KeeperTestSuite struct {

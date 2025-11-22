@@ -16,11 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 type BatchTradesLoadTestSuite struct {

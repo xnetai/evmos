@@ -15,14 +15,14 @@ import (
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/evmos/evmos/v20/contracts"
-	"github.com/evmos/evmos/v20/precompiles/staking"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	testkeyring "github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	integrationutils "github.com/evmos/evmos/v20/testutil/integration/evmos/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/contracts"
+	"github.com/evmos/xcoin/v20/precompiles/staking"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	testkeyring "github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	integrationutils "github.com/evmos/xcoin/v20/testutil/integration/evmos/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 type IntegrationTestSuite struct {

@@ -10,9 +10,9 @@ import (
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 const (

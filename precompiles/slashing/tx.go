@@ -6,8 +6,8 @@ package slashing
 import (
 	"fmt"
 
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"

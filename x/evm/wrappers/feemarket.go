@@ -7,8 +7,8 @@ import (
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/evmos/evmos/v20/x/evm/types"
-	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
+	"github.com/evmos/xcoin/v20/x/evm/types"
+	feemarkettypes "github.com/evmos/xcoin/v20/x/feemarket/types"
 )
 
 // FeeMarketWrapper is a wrapper around the feemarket keeper

@@ -6,7 +6,7 @@ package types
 import (
 	"fmt"
 
-	evmostypes "github.com/evmos/evmos/v20/types"
+	evmostypes "github.com/evmos/xcoin/v20/types"
 )
 
 var DefaultTokenPairs = []TokenPair{

@@ -8,11 +8,11 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/evmos/evmos/v20/precompiles/slashing"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	testkeyring "github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
+	"github.com/evmos/xcoin/v20/precompiles/slashing"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	testkeyring "github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
 
 	"github.com/stretchr/testify/suite"
 )

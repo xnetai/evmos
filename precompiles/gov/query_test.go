@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	evmostypes "github.com/evmos/evmos/v20/types"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	evmostypes "github.com/evmos/xcoin/v20/types"
 
 	"cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/testutil/testdata"
@@ -16,9 +16,9 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/evmos/evmos/v20/precompiles/gov"
-	"github.com/evmos/evmos/v20/precompiles/testutil"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
+	"github.com/evmos/xcoin/v20/precompiles/gov"
+	"github.com/evmos/xcoin/v20/precompiles/testutil"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
 )
 
 var (

@@ -7,10 +7,10 @@ import (
 	"cosmossdk.io/math"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/evmos/evmos/v20/precompiles/authorization"
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	testutiltx "github.com/evmos/evmos/v20/testutil/tx"
-	evmostypes "github.com/evmos/evmos/v20/types"
+	"github.com/evmos/xcoin/v20/precompiles/authorization"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	testutiltx "github.com/evmos/xcoin/v20/testutil/tx"
+	evmostypes "github.com/evmos/xcoin/v20/types"
 	"github.com/stretchr/testify/require"
 )
 

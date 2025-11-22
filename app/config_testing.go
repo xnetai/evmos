@@ -12,7 +12,7 @@ import (
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // EvmosOptionsFn defines a function type for setting app options specifically for

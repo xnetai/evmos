@@ -15,10 +15,10 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	testtx "github.com/evmos/evmos/v20/testutil/tx"
-	evmostypes "github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	testtx "github.com/evmos/xcoin/v20/testutil/tx"
+	evmostypes "github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // defaultChain represents the default chain ID used in the suite setup.

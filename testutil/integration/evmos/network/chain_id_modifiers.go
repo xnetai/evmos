@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/evmos/evmos/v20/utils"
-	erc20types "github.com/evmos/evmos/v20/x/erc20/types"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/utils"
+	erc20types "github.com/evmos/xcoin/v20/x/erc20/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // updateErc20GenesisStateForChainID modify the default genesis state for the

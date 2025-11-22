@@ -7,8 +7,8 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	typesV4 "github.com/evmos/evmos/v20/x/feemarket/migrations/v5/types"
-	"github.com/evmos/evmos/v20/x/feemarket/types"
+	typesV4 "github.com/evmos/xcoin/v20/x/feemarket/migrations/v5/types"
+	"github.com/evmos/xcoin/v20/x/feemarket/types"
 )
 
 // MigrateStore migrates the x/feemarket module state from the consensus version 4 to

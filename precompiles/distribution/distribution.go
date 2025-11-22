@@ -12,10 +12,10 @@ import (
 	distributionkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
-	stakingkeeper "github.com/evmos/evmos/v20/x/staking/keeper"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
+	stakingkeeper "github.com/evmos/xcoin/v20/x/staking/keeper"
 )
 
 var _ vm.PrecompiledContract = &Precompile{}

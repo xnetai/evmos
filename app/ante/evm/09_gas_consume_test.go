@@ -7,11 +7,11 @@ import (
 
 	"cosmossdk.io/math"
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
-	evmante "github.com/evmos/evmos/v20/app/ante/evm"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	testkeyring "github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	evmante "github.com/evmos/xcoin/v20/app/ante/evm"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	testkeyring "github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 func (suite *EvmAnteTestSuite) TestUpdateCumulativeGasWanted() {

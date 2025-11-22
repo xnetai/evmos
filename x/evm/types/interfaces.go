@@ -14,9 +14,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
 
-	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
+	feemarkettypes "github.com/evmos/xcoin/v20/x/feemarket/types"
 )
 
 // AccountKeeper defines the expected account keeper interface

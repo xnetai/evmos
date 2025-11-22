@@ -10,8 +10,8 @@ import (
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/evmos/evmos/v20/types"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 
 	"github.com/stretchr/testify/require"
 )

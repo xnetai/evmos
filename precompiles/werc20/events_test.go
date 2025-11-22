@@ -13,15 +13,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	"github.com/evmos/evmos/v20/precompiles/werc20"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	"github.com/evmos/evmos/v20/utils"
-	erc20types "github.com/evmos/evmos/v20/x/erc20/types"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	"github.com/evmos/xcoin/v20/precompiles/werc20"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	"github.com/evmos/xcoin/v20/utils"
+	erc20types "github.com/evmos/xcoin/v20/x/erc20/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 type PrecompileUnitTestSuite struct {

@@ -10,9 +10,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/query"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ethereum/go-ethereum/common"
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	"github.com/evmos/evmos/v20/precompiles/slashing"
-	"github.com/evmos/evmos/v20/precompiles/testutil"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	"github.com/evmos/xcoin/v20/precompiles/slashing"
+	"github.com/evmos/xcoin/v20/precompiles/testutil"
 )
 
 func (s *PrecompileTestSuite) TestGetSigningInfo() {

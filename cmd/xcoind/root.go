@@ -45,19 +45,19 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
-	evmostypes "github.com/evmos/evmos/v20/types"
+	evmostypes "github.com/evmos/xcoin/v20/types"
 
 	rosettaCmd "github.com/cosmos/rosetta/cmd"
 
-	evmosclient "github.com/evmos/evmos/v20/client"
-	"github.com/evmos/evmos/v20/client/block"
-	"github.com/evmos/evmos/v20/client/debug"
-	evmosserver "github.com/evmos/evmos/v20/server"
-	servercfg "github.com/evmos/evmos/v20/server/config"
-	srvflags "github.com/evmos/evmos/v20/server/flags"
+	evmosclient "github.com/evmos/xcoin/v20/client"
+	"github.com/evmos/xcoin/v20/client/block"
+	"github.com/evmos/xcoin/v20/client/debug"
+	evmosserver "github.com/evmos/xcoin/v20/server"
+	servercfg "github.com/evmos/xcoin/v20/server/config"
+	srvflags "github.com/evmos/xcoin/v20/server/flags"
 
-	"github.com/evmos/evmos/v20/app"
-	evmoskr "github.com/evmos/evmos/v20/crypto/keyring"
+	"github.com/evmos/xcoin/v20/app"
+	evmoskr "github.com/evmos/xcoin/v20/crypto/keyring"
 )
 
 const EnvPrefix = "EVMOS"
@@ -66,7 +66,7 @@ type emptyAppOptions struct{}
 
 func (ao emptyAppOptions) Get(_ string) interface{} { return nil }
 
-// NewRootCmd creates a new root command for evmosd. It is called once in the
+// NewRootCmd creates a new root command for xcoind. It is called once in the
 // main function.
 func NewRootCmd() (*cobra.Command, sdktestutil.TestEncodingConfig) {
 	// we "pre"-instantiate the application for getting the injected/configured encoding configuration

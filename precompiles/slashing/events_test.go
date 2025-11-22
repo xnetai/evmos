@@ -12,10 +12,10 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	"github.com/evmos/evmos/v20/precompiles/slashing"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
-	"github.com/evmos/evmos/v20/x/evm/statedb"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	"github.com/evmos/xcoin/v20/precompiles/slashing"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
+	"github.com/evmos/xcoin/v20/x/evm/statedb"
 )
 
 func (s *PrecompileTestSuite) TestUnjailEvent() {

@@ -9,12 +9,12 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	testkeyring "github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	evmostypes "github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
-	"github.com/evmos/evmos/v20/x/inflation/v1/types"
+	testkeyring "github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	evmostypes "github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/x/inflation/v1/types"
 	"github.com/stretchr/testify/require"
 )
 

@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
 )
 
 // ProductionNetwork manages multiple validator processes running separately

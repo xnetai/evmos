@@ -15,14 +15,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/evmos/evmos/v20/app"
-	"github.com/evmos/evmos/v20/crypto/ethsecp256k1"
-	utiltx "github.com/evmos/evmos/v20/testutil/tx"
+	"github.com/evmos/xcoin/v20/app"
+	"github.com/evmos/xcoin/v20/crypto/ethsecp256k1"
+	utiltx "github.com/evmos/xcoin/v20/testutil/tx"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/evmos/evmos/v20/encoding"
-	evmostypes "github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/encoding"
+	evmostypes "github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 const invalidAddress = "0x0000"

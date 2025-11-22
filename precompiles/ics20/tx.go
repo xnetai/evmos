@@ -14,10 +14,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
 )
 
 const (

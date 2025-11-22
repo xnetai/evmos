@@ -13,10 +13,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/evmos/evmos/v20/app/ante/evm"
-	testkeyring "github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/types"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/app/ante/evm"
+	testkeyring "github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 type validateMsgParams struct {

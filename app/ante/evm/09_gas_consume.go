@@ -9,8 +9,8 @@ import (
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/evmos/evmos/v20/types"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // UpdateCumulativeGasWanted updates the cumulative gas wanted

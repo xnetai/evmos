@@ -10,8 +10,8 @@ import (
 	"fmt"
 
 	"cosmossdk.io/math"
-	"github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/utils"
+	"github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/utils"
 )
 
 // NOTE: Remember to add the ConversionFactor associated with constants.

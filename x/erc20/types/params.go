@@ -9,8 +9,8 @@ import (
 	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/utils"
+	"github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/utils"
 )
 
 const (

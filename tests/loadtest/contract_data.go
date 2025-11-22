@@ -4,10 +4,10 @@
 package loadtest
 
 import (
-	contractutils "github.com/evmos/evmos/v20/contracts/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
-	"github.com/evmos/evmos/v20/precompiles/testutil"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
+	contractutils "github.com/evmos/xcoin/v20/contracts/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/precompiles/testutil"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
 )
 
 // LoadBatchOrderBookContract loads the compiled BatchOrderBook contract from JSON

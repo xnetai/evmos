@@ -13,14 +13,14 @@ import (
 	sdkvesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
-	"github.com/evmos/evmos/v20/precompiles/testutil"
-	"github.com/evmos/evmos/v20/precompiles/vesting"
-	evmosutil "github.com/evmos/evmos/v20/testutil"
-	evmosutiltx "github.com/evmos/evmos/v20/testutil/tx"
-	evmostypes "github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
-	vestingtypes "github.com/evmos/evmos/v20/x/vesting/types"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
+	"github.com/evmos/xcoin/v20/precompiles/testutil"
+	"github.com/evmos/xcoin/v20/precompiles/vesting"
+	evmosutil "github.com/evmos/xcoin/v20/testutil"
+	evmosutiltx "github.com/evmos/xcoin/v20/testutil/tx"
+	evmostypes "github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
+	vestingtypes "github.com/evmos/xcoin/v20/x/vesting/types"
 )
 
 var (

@@ -12,10 +12,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
-	"github.com/evmos/evmos/v20/testutil/integration/common/factory"
-	testutils "github.com/evmos/evmos/v20/testutil/integration/evmos/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
-	fmkttypes "github.com/evmos/evmos/v20/x/feemarket/types"
+	"github.com/evmos/xcoin/v20/testutil/integration/common/factory"
+	testutils "github.com/evmos/xcoin/v20/testutil/integration/evmos/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
+	fmkttypes "github.com/evmos/xcoin/v20/x/feemarket/types"
 
 	//nolint:revive // dot imports are fine for Ginkgo
 	. "github.com/onsi/ginkgo/v2"

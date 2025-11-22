@@ -3,8 +3,8 @@
 package app
 
 import (
-	"github.com/evmos/evmos/v20/app/eips"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
+	"github.com/evmos/xcoin/v20/app/eips"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
 )
 
 // evmosActivators defines a map of opcode modifiers associated

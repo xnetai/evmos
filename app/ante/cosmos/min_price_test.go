@@ -7,9 +7,9 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	cosmosante "github.com/evmos/evmos/v20/app/ante/cosmos"
-	"github.com/evmos/evmos/v20/testutil"
-	testutiltx "github.com/evmos/evmos/v20/testutil/tx"
+	cosmosante "github.com/evmos/xcoin/v20/app/ante/cosmos"
+	"github.com/evmos/xcoin/v20/testutil"
+	testutiltx "github.com/evmos/xcoin/v20/testutil/tx"
 )
 
 var execTypes = []struct {

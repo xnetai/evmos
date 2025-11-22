@@ -15,7 +15,7 @@ import (
 	sdkmath "cosmossdk.io/math"
 	"github.com/ethereum/go-ethereum/common"
 	geth "github.com/ethereum/go-ethereum/params"
-	"github.com/evmos/evmos/v20/types"
+	"github.com/evmos/xcoin/v20/types"
 )
 
 // testChainID represents the ChainID used for the purpose of testing.

@@ -9,17 +9,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/evmos/evmos/v20/precompiles/bank"
-	"github.com/evmos/evmos/v20/precompiles/bank/testdata"
-	"github.com/evmos/evmos/v20/precompiles/testutil"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	testutils "github.com/evmos/evmos/v20/testutil/integration/evmos/utils"
-	utiltx "github.com/evmos/evmos/v20/testutil/tx"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
-	inflationtypes "github.com/evmos/evmos/v20/x/inflation/v1/types"
+	"github.com/evmos/xcoin/v20/precompiles/bank"
+	"github.com/evmos/xcoin/v20/precompiles/bank/testdata"
+	"github.com/evmos/xcoin/v20/precompiles/testutil"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	testutils "github.com/evmos/xcoin/v20/testutil/integration/evmos/utils"
+	utiltx "github.com/evmos/xcoin/v20/testutil/tx"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
+	inflationtypes "github.com/evmos/xcoin/v20/x/inflation/v1/types"
 
 	//nolint:revive // dot imports are fine for Ginkgo
 	. "github.com/onsi/ginkgo/v2"

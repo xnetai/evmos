@@ -10,7 +10,7 @@ import (
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	evmostypes "github.com/evmos/evmos/v20/types"
+	evmostypes "github.com/evmos/xcoin/v20/types"
 )
 
 // FoundationWallets contains the address of the foundation that held tokens to

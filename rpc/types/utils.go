@@ -17,7 +17,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"

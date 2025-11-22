@@ -8,7 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
 )
 
 // SubmitEvidence implements the evidence submission logic for the evidence precompile.

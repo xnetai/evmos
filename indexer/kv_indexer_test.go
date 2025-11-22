@@ -11,12 +11,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/evmos/evmos/v20/crypto/ethsecp256k1"
-	"github.com/evmos/evmos/v20/indexer"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	utiltx "github.com/evmos/evmos/v20/testutil/tx"
-	evmostypes "github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/crypto/ethsecp256k1"
+	"github.com/evmos/xcoin/v20/indexer"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	utiltx "github.com/evmos/xcoin/v20/testutil/tx"
+	evmostypes "github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/x/evm/types"
 	"github.com/stretchr/testify/require"
 )
 

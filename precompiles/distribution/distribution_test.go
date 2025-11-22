@@ -10,10 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/evmos/evmos/v20/app"
-	"github.com/evmos/evmos/v20/precompiles/distribution"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/app"
+	"github.com/evmos/xcoin/v20/precompiles/distribution"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 func (s *PrecompileTestSuite) TestIsTransaction() {

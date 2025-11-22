@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/evmos/evmos/v20/utils"
+	"github.com/evmos/xcoin/v20/utils"
 	"github.com/stretchr/testify/suite"
 )
 

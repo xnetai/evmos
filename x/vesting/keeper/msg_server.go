@@ -13,8 +13,8 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	sdkvesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	distributiontypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
-	"github.com/evmos/evmos/v20/utils"
-	"github.com/evmos/evmos/v20/x/vesting/types"
+	"github.com/evmos/xcoin/v20/utils"
+	"github.com/evmos/xcoin/v20/x/vesting/types"
 )
 
 var _ types.MsgServer = &Keeper{}

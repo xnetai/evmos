@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // callType constants to differentiate between

@@ -4,7 +4,7 @@
 package network
 
 import (
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 type CoinInfo struct {

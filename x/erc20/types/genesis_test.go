@@ -3,8 +3,8 @@ package types_test
 import (
 	"testing"
 
-	evmostypes "github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/x/erc20/types"
+	evmostypes "github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/x/erc20/types"
 	"github.com/stretchr/testify/suite"
 )
 

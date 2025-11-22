@@ -19,13 +19,13 @@ import (
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	"github.com/evmos/evmos/v20/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
-	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	"github.com/evmos/xcoin/v20/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
+	feemarkettypes "github.com/evmos/xcoin/v20/x/feemarket/types"
 )
 
 // MultiNodeLoadTestWithGasSuite tests batch trades with gas fees enabled

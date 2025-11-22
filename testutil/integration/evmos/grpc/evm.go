@@ -10,8 +10,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // GetEvmAccount returns the EVM account for the given address.

@@ -7,11 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/evmos/evmos/v20/app"
-	"github.com/evmos/evmos/v20/precompiles/gov"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
-	"github.com/evmos/evmos/v20/x/evm/statedb"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/app"
+	"github.com/evmos/xcoin/v20/precompiles/gov"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
+	"github.com/evmos/xcoin/v20/x/evm/statedb"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 func (s *PrecompileTestSuite) TestIsTransaction() {

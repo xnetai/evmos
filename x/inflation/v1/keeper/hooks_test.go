@@ -8,9 +8,9 @@ import (
 	"cosmossdk.io/math"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	epochstypes "github.com/evmos/evmos/v20/x/epochs/types"
-	"github.com/evmos/evmos/v20/x/inflation/v1/types"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	epochstypes "github.com/evmos/xcoin/v20/x/epochs/types"
+	"github.com/evmos/xcoin/v20/x/inflation/v1/types"
 	"github.com/stretchr/testify/require"
 )
 

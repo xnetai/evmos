@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/evmos/evmos/v20/tests/e2e/upgrade"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/tests/e2e/upgrade"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // executeTransactions executes some sample transactions to check they are still working after the upgrade.

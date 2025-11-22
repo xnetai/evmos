@@ -23,14 +23,14 @@ import (
 	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/grpc"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/utils"
-	evmosutils "github.com/evmos/evmos/v20/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
-	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/factory"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/grpc"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/utils"
+	evmosutils "github.com/evmos/xcoin/v20/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
+	feemarkettypes "github.com/evmos/xcoin/v20/x/feemarket/types"
 )
 
 // Asset pair definitions for trading

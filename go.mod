@@ -1,4 +1,4 @@
-module github.com/evmos/evmos/v20
+module github.com/evmos/xcoin/v20
 
 go 1.22.8
 

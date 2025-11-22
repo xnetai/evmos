@@ -13,8 +13,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/evmos/evmos/v20/types"
-	"github.com/evmos/evmos/v20/x/evm/core/vm"
+	"github.com/evmos/xcoin/v20/types"
+	"github.com/evmos/xcoin/v20/x/evm/core/vm"
 )
 
 var (

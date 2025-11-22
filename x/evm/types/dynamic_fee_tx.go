@@ -12,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/evmos/evmos/v20/types"
-	ethutils "github.com/evmos/evmos/v20/utils/eth"
+	"github.com/evmos/xcoin/v20/types"
+	ethutils "github.com/evmos/xcoin/v20/utils/eth"
 )
 
 func NewDynamicFeeTx(tx *ethtypes.Transaction) (*DynamicFeeTx, error) {

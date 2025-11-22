@@ -6,8 +6,8 @@ import (
 	"math/big"
 
 	"cosmossdk.io/math"
-	"github.com/evmos/evmos/v20/types"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )

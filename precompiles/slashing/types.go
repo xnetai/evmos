@@ -12,7 +12,7 @@ import (
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	cmn "github.com/evmos/evmos/v20/precompiles/common"
+	cmn "github.com/evmos/xcoin/v20/precompiles/common"
 )
 
 // SigningInfo represents the signing info for a validator

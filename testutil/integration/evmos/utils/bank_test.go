@@ -6,10 +6,10 @@ import (
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	testkeyring "github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	testkeyring "github.com/evmos/xcoin/v20/testutil/integration/evmos/keyring"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 	"github.com/stretchr/testify/require"
 )
 

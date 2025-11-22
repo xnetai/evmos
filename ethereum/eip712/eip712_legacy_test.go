@@ -8,7 +8,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/evmos/evmos/v20/ethereum/eip712"
+	"github.com/evmos/xcoin/v20/ethereum/eip712"
 	"github.com/stretchr/testify/require"
 )
 

@@ -12,7 +12,7 @@ import (
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/tx"
 
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // ValidateMsg validates an Ethereum specific message type and returns an error

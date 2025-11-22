@@ -4,8 +4,8 @@
 package contracts
 
 import (
-	contractutils "github.com/evmos/evmos/v20/contracts/utils"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	contractutils "github.com/evmos/xcoin/v20/contracts/utils"
+	evmtypes "github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 func LoadFlashLoanContract() (evmtypes.CompiledContract, error) {

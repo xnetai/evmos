@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/evmos/evmos/v20/x/evm/types"
+	"github.com/evmos/xcoin/v20/x/evm/types"
 )
 
 // NewTxCmd returns a root CLI command handler for evm module transaction commands

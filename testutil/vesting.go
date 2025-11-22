@@ -6,7 +6,7 @@ import (
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkvesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
-	evmostypes "github.com/evmos/evmos/v20/types"
+	evmostypes "github.com/evmos/xcoin/v20/types"
 )
 
 type vestingSchedule struct {

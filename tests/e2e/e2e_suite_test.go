@@ -10,9 +10,9 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
-	"github.com/evmos/evmos/v20/tests/e2e/upgrade"
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
-	"github.com/evmos/evmos/v20/utils"
+	"github.com/evmos/xcoin/v20/tests/e2e/upgrade"
+	"github.com/evmos/xcoin/v20/testutil/integration/evmos/network"
+	"github.com/evmos/xcoin/v20/utils"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -176,7 +176,7 @@ func (s *IntegrationTestSuite) upgrade(targetVersion upgrade.VersionConfig) {
 	s.checkProposalPassed(ctx)
 
 	s.T().Log("exporting state to local...")
-	// export node .evmosd to local build/
+	// export node .xcoind to local build/
 	err = s.upgradeManager.ExportState(buildDir)
 	s.Require().NoError(err, "can't export node container state to local")
 
@@ -199,7 +199,7 @@ func (s *IntegrationTestSuite) upgrade(targetVersion upgrade.VersionConfig) {
 
 	node := upgrade.NewNode(targetVersion.ImageName, targetVersion.ImageTag)
 	node.Mount(s.upgradeParams.MountPath)
-	node.SetCmd([]string{"evmosd", "start", fmt.Sprintf("--chain-id=%s", s.upgradeParams.ChainID), fmt.Sprintf("--home=%s.evmosd", rootDir)})
+	node.SetCmd([]string{"xcoind", "start", fmt.Sprintf("--chain-id=%s", s.upgradeParams.ChainID), fmt.Sprintf("--home=%s.xcoind", rootDir)})
 	err = s.upgradeManager.RunNode(node)
 	s.Require().NoError(err, "can't mount and run upgraded node container")
 
