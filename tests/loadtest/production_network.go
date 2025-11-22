@@ -4,6 +4,7 @@
 package loadtest
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -178,6 +179,9 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 	// Set up validator process info
 	// The daemon home directory name depends on the binary (evmosd or xcoind)
 	daemonHome := pn.binaryName
+
+	// First pass: collect node IDs and create validator structs
+	nodeIDs := make([]string, numValidators)
 	for i := 0; i < numValidators; i++ {
 		nodeDir := filepath.Join(pn.baseDir, fmt.Sprintf("node%d", i), daemonHome)
 
@@ -192,6 +196,62 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		}
 
 		pn.validators[i] = validator
+
+		// Read node ID from node_key.json
+		nodeKeyPath := filepath.Join(nodeDir, "config", "node_key.json")
+		nodeKeyData, err := os.ReadFile(nodeKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to read node_key.json for validator %d: %w", i, err)
+		}
+
+		// Parse node ID from JSON
+		var nodeKey struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(nodeKeyData, &nodeKey); err != nil {
+			return fmt.Errorf("failed to parse node_key.json for validator %d: %w", i, err)
+		}
+		nodeIDs[i] = nodeKey.ID
+		fmt.Printf("Validator %d node ID: %s\n", i, nodeKey.ID)
+	}
+
+	// Second pass: update config.toml with correct persistent_peers
+	for i, val := range pn.validators {
+		configPath := filepath.Join(val.NodeDir, "config", "config.toml")
+
+		// Build persistent_peers list (exclude self)
+		var peers []string
+		for j := 0; j < numValidators; j++ {
+			if j != i {
+				peerAddr := fmt.Sprintf("%s@127.0.0.1:%d", nodeIDs[j], 26656+(j*10))
+				peers = append(peers, peerAddr)
+			}
+		}
+		persistentPeers := strings.Join(peers, ",")
+
+		// Read config file
+		configData, err := os.ReadFile(configPath)
+		if err != nil {
+			return fmt.Errorf("failed to read config.toml for validator %d: %w", i, err)
+		}
+
+		// Replace persistent_peers line
+		configStr := string(configData)
+		lines := strings.Split(configStr, "\n")
+		for idx, line := range lines {
+			if strings.HasPrefix(strings.TrimSpace(line), "persistent_peers = ") {
+				lines[idx] = fmt.Sprintf(`persistent_peers = "%s"`, persistentPeers)
+				break
+			}
+		}
+		configStr = strings.Join(lines, "\n")
+
+		// Write back config file
+		if err := os.WriteFile(configPath, []byte(configStr), 0644); err != nil {
+			return fmt.Errorf("failed to write config.toml for validator %d: %w", i, err)
+		}
+
+		fmt.Printf("Validator %d persistent_peers: %s\n", i, persistentPeers)
 	}
 
 	return nil
