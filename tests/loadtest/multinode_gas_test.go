@@ -33,7 +33,7 @@ import (
 type MultiNodeLoadTestWithGasSuite struct {
 	suite.Suite
 
-	network     network.Network
+	network     *network.UnitTestNetwork
 	factory     factory.TxFactory
 	grpcHandler grpc.Handler
 	keyring     keyring.Keyring
@@ -88,7 +88,7 @@ func (s *MultiNodeLoadTestWithGasSuite) SetupSuite() {
 
 	// Create the network with multiple validators
 	// Using TestingChainID (evmos_9002) which maps to txcoin as the base denom
-	s.network = network.New(
+	s.network = network.NewUnitTestNetwork(
 		network.WithChainID(utils.TestingChainID+"-1"),
 		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
 		network.WithAmountOfValidators(numValidators),
@@ -192,16 +192,16 @@ func (s *MultiNodeLoadTestWithGasSuite) setupTestAssets() {
 		coins := sdktypes.NewCoins(sdktypes.NewCoin(asset, initialAmount))
 
 		// Mint to trader
-		err := s.network.GetBankKeeper().MintCoins(s.network.GetContext(), evmtypes.ModuleName, coins)
+		err := s.network.App.BankKeeper.MintCoins(s.network.GetContext(), evmtypes.ModuleName, coins)
 		require.NoError(s.T(), err, "failed to mint %s", asset)
-		err = s.network.GetBankKeeper().SendCoinsFromModuleToAccount(
+		err = s.network.App.BankKeeper.SendCoinsFromModuleToAccount(
 			s.network.GetContext(), evmtypes.ModuleName, traderAddr, coins)
 		require.NoError(s.T(), err, "failed to send %s to trader", asset)
 
 		// Mint to secondary
-		err = s.network.GetBankKeeper().MintCoins(s.network.GetContext(), evmtypes.ModuleName, coins)
+		err = s.network.App.BankKeeper.MintCoins(s.network.GetContext(), evmtypes.ModuleName, coins)
 		require.NoError(s.T(), err, "failed to mint %s for secondary", asset)
-		err = s.network.GetBankKeeper().SendCoinsFromModuleToAccount(
+		err = s.network.App.BankKeeper.SendCoinsFromModuleToAccount(
 			s.network.GetContext(), evmtypes.ModuleName, secondaryAddr, coins)
 		require.NoError(s.T(), err, "failed to send %s to secondary", asset)
 
@@ -210,7 +210,7 @@ func (s *MultiNodeLoadTestWithGasSuite) setupTestAssets() {
 	}
 
 	baseDenom := s.network.GetBaseDenom()
-	baseBalance := s.network.GetBankKeeper().GetBalance(s.network.GetContext(), traderAddr, baseDenom)
+	baseBalance := s.network.App.BankKeeper.GetBalance(s.network.GetContext(), traderAddr, baseDenom)
 	s.initialBalances[baseDenom] = baseBalance.Amount
 	s.T().Logf("  ✓ Recorded initial %s balance: %s", baseDenom, baseBalance.Amount.String())
 
@@ -344,7 +344,7 @@ func (s *MultiNodeLoadTestWithGasSuite) submitBatchWithGas(
 ) {
 	// Simulate trades (reuse from main suite)
 	ctx := s.network.GetContext()
-	bankKeeper := s.network.GetBankKeeper()
+	bankKeeper := s.network.App.BankKeeper
 	traderAddr := key.AccAddr
 	secondaryAddr := s.keyring.GetKey(1).AccAddr
 
@@ -461,7 +461,7 @@ func (s *MultiNodeLoadTestWithGasSuite) verifyBalancesWithGas(tradesPerBatch int
 	s.T().Log("╚════════════════════════════════════════════════════════╝\n")
 
 	ctx := s.network.GetContext()
-	bankKeeper := s.network.GetBankKeeper()
+	bankKeeper := s.network.App.BankKeeper
 	traderAddr := s.keyring.GetKey(0).AccAddr
 
 	s.T().Log("Balance Changes (including gas fees):")
