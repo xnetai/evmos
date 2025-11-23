@@ -56,7 +56,7 @@ var (
 type MultiNodeLoadTestSuite struct {
 	suite.Suite
 
-	network     network.Network
+	network     *network.UnitTestNetwork
 	factory     factory.TxFactory
 	grpcHandler grpc.Handler
 	keyring     keyring.Keyring
@@ -299,7 +299,7 @@ func (s *MultiNodeLoadTestSuite) SetupSuite() {
 
 	// Create the network with multiple validators
 	// Using TestingChainID (evmos_9002) which maps to txcoin as the base denom
-	s.network = network.New(
+	s.network = network.NewUnitTestNetwork(
 		network.WithChainID(evmosutils.TestingChainID+"-1"),
 		network.WithPreFundedAccounts(keyring.GetAllAccAddrs()...),
 		network.WithAmountOfValidators(numValidators),
@@ -546,10 +546,10 @@ func (s *MultiNodeLoadTestSuite) setupTestAssets() {
 	for _, asset := range TestAssets {
 		// Mint tokens to trader account
 		coins := sdktypes.NewCoins(sdktypes.NewCoin(asset, initialAmount))
-		err := s.network.GetBankKeeper().MintCoins(s.network.GetContext(), evmtypes.ModuleName, coins)
+		err := s.network.App.BankKeeper.MintCoins(s.network.GetContext(), evmtypes.ModuleName, coins)
 		require.NoError(s.T(), err, "failed to mint %s", asset)
 
-		err = s.network.GetBankKeeper().SendCoinsFromModuleToAccount(
+		err = s.network.App.BankKeeper.SendCoinsFromModuleToAccount(
 			s.network.GetContext(),
 			evmtypes.ModuleName,
 			traderAddr,
@@ -558,10 +558,10 @@ func (s *MultiNodeLoadTestSuite) setupTestAssets() {
 		require.NoError(s.T(), err, "failed to send %s to trader", asset)
 
 		// Also mint to secondary account for trade simulation
-		err = s.network.GetBankKeeper().MintCoins(s.network.GetContext(), evmtypes.ModuleName, coins)
+		err = s.network.App.BankKeeper.MintCoins(s.network.GetContext(), evmtypes.ModuleName, coins)
 		require.NoError(s.T(), err, "failed to mint %s for secondary", asset)
 
-		err = s.network.GetBankKeeper().SendCoinsFromModuleToAccount(
+		err = s.network.App.BankKeeper.SendCoinsFromModuleToAccount(
 			s.network.GetContext(),
 			evmtypes.ModuleName,
 			secondaryAddr,
@@ -577,7 +577,7 @@ func (s *MultiNodeLoadTestSuite) setupTestAssets() {
 
 	// Also record base denom (txcoin) balance
 	baseDenom := s.network.GetBaseDenom()
-	baseBalance := s.network.GetBankKeeper().GetBalance(s.network.GetContext(), traderAddr, baseDenom)
+	baseBalance := s.network.App.BankKeeper.GetBalance(s.network.GetContext(), traderAddr, baseDenom)
 	s.initialBalances[baseDenom] = baseBalance.Amount
 	s.T().Logf("  ✓ Recorded initial %s balance: %s", baseDenom, baseBalance.Amount.String())
 
@@ -622,7 +622,7 @@ func (s *MultiNodeLoadTestSuite) ensureSufficientBalance(totalFeesNeeded int) {
 	traderAddr := traderKey.AccAddr
 	baseDenom := s.network.GetBaseDenom()
 	ctx := s.network.GetContext()
-	bankKeeper := s.network.GetBankKeeper()
+	bankKeeper := s.network.App.BankKeeper
 
 	// Prefund with 1,000,000 xcoin to ensure sufficient balance for all tests
 	prefundAmount := sdkmath.NewInt(1_000_000)
@@ -1263,7 +1263,7 @@ func (s *MultiNodeLoadTestSuite) queryTradesInBlock(blockHeight int64) int {
 // This represents actual trades happening across different pairs
 func (s *MultiNodeLoadTestSuite) simulateAssetTrades(key keyring.Key, tradeCount int) {
 	ctx := s.network.GetContext()
-	bankKeeper := s.network.GetBankKeeper()
+	bankKeeper := s.network.App.BankKeeper
 	traderAddr := key.AccAddr
 
 	// Calculate trades per pair (distribute evenly across all trading pairs)
@@ -1667,7 +1667,7 @@ func (s *MultiNodeLoadTestSuite) verifyAssetBalances(tradesPerBatch int, totalBa
 	s.T().Log("╚════════════════════════════════════════════════════════╝\n")
 
 	ctx := s.network.GetContext()
-	bankKeeper := s.network.GetBankKeeper()
+	bankKeeper := s.network.App.BankKeeper
 	traderKey := s.keyring.GetKey(0)
 	traderAddr := traderKey.AccAddr
 
