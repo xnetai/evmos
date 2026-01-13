@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	sdktypes "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
@@ -46,10 +47,11 @@ type NodeClient struct {
 
 // NewNodeClient creates a new NodeClient for a specific validator
 func NewNodeClient(validator *ValidatorProcess) (*NodeClient, error) {
-	grpcAddr := fmt.Sprintf("localhost:%d", validator.GRPCPort)
-	rpcAddr := fmt.Sprintf("http://localhost:%d", validator.RPCPort)
-	apiAddr := fmt.Sprintf("http://localhost:%d", validator.APIPort)
-	jsonRPCAddr := fmt.Sprintf("http://localhost:%d", validator.JSONRPCPort)
+	// Use 127.0.0.1 instead of localhost to avoid IPv6 issues
+	grpcAddr := fmt.Sprintf("127.0.0.1:%d", validator.GRPCPort)
+	rpcAddr := fmt.Sprintf("http://127.0.0.1:%d", validator.RPCPort)
+	apiAddr := fmt.Sprintf("http://127.0.0.1:%d", validator.APIPort)
+	jsonRPCAddr := fmt.Sprintf("http://127.0.0.1:%d", validator.JSONRPCPort)
 
 	// Create gRPC connection
 	grpcConn, err := grpc.NewClient(
@@ -220,6 +222,16 @@ func (nc *NodeClient) IsHealthy() bool {
 
 	_, err := nc.rpcClient.Status(ctx)
 	return err == nil
+}
+
+// GetAllBalances queries all balances for an address from this node
+func (nc *NodeClient) GetAllBalances(address sdktypes.AccAddress) (*banktypes.QueryAllBalancesResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	return nc.bankClient.AllBalances(ctx, &banktypes.QueryAllBalancesRequest{
+		Address: address.String(),
+	})
 }
 
 // RoundRobinDistributor distributes transactions across nodes in round-robin fashion

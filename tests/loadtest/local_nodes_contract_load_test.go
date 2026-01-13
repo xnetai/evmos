@@ -5,7 +5,10 @@ package loadtest
 
 import (
 	"fmt"
+	"math/big"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -65,6 +68,9 @@ type LocalNodesContractLoadTestSuite struct {
 
 	// Validators (for staking operations)
 	validators []stakingtypes.Validator
+
+	// Balance tracking
+	initialBalances map[string]map[string]string // address -> denom -> amount
 }
 
 // TestLocalNodesContractLoad runs the test suite
@@ -158,6 +164,10 @@ func (s *LocalNodesContractLoadTestSuite) SetupSuite() {
 	s.nonceTracker = NewNonceTracker()
 	s.T().Log("✓ Nonce tracker initialized\n")
 
+	s.T().Log("Step 11: Capturing initial account balances...")
+	s.captureInitialBalances()
+	s.T().Log("✓ Initial balances captured\n")
+
 	s.T().Log("\n╔════════════════════════════════════════════════════════════╗")
 	s.T().Log("║     Setup Complete - Ready for Load Testing               ║")
 	s.T().Log("╚════════════════════════════════════════════════════════════╝\n")
@@ -169,8 +179,16 @@ func (s *LocalNodesContractLoadTestSuite) TearDownSuite() {
 	s.T().Log("║     Test Teardown - Cleanup                                ║")
 	s.T().Log("╚════════════════════════════════════════════════════════════╝\n")
 
+	// Wait a moment for any pending transactions to settle
+	s.T().Log("Waiting for transactions to settle...")
+	time.Sleep(2 * time.Second)
+	s.T().Log("✓ Wait complete\n")
+
 	// Print final comprehensive statistics
 	s.printFinalStatistics()
+
+	// Log balance changes (must be done before cleanup while nodes are still running)
+	s.logBalanceChanges()
 
 	// Close all node clients
 	if s.nodeClients != nil {
@@ -380,4 +398,201 @@ func (s *LocalNodesContractLoadTestSuite) printFinalStatistics() {
 	if s.stats.TotalErrors.Load() > 0 {
 		s.T().Log(s.stats.PrintErrorBreakdown())
 	}
+}
+
+// captureInitialBalances captures all account balances before the test
+func (s *LocalNodesContractLoadTestSuite) captureInitialBalances() {
+	s.initialBalances = make(map[string]map[string]string)
+
+	// Use the first node client to query balances from the production network
+	if len(s.nodeClients) == 0 {
+		s.T().Log("Warning: no node clients available to query balances")
+		return
+	}
+
+	nodeClient := s.nodeClients[0]
+
+	// Capture balances for all 100 user accounts
+	for i := 0; i < numUsers; i++ {
+		key := s.keyring.GetKey(i)
+		addr := key.AccAddr
+
+		// Query all balances for this account from production network
+		balancesResp, err := nodeClient.GetAllBalances(addr)
+		if err != nil {
+			s.T().Logf("Warning: failed to get initial balances for account %d (%s): %v", i, addr.String(), err)
+			continue
+		}
+
+		// Store balances by denom
+		denomBalances := make(map[string]string)
+		for _, coin := range balancesResp.Balances {
+			denomBalances[coin.Denom] = coin.Amount.String()
+		}
+		s.initialBalances[addr.String()] = denomBalances
+	}
+
+	s.T().Logf("Captured initial balances for %d accounts", len(s.initialBalances))
+}
+
+// logBalanceChanges logs all balance changes to a file
+func (s *LocalNodesContractLoadTestSuite) logBalanceChanges() {
+	s.T().Log("\n╔════════════════════════════════════════════════════════════╗")
+	s.T().Log("║     BALANCE CHANGES                                        ║")
+	s.T().Log("╚════════════════════════════════════════════════════════════╝\n")
+
+	// Create log file
+	logFileName := fmt.Sprintf("balance_changes_%s.log", time.Now().Format("20060102_150405"))
+	logFilePath := filepath.Join(os.TempDir(), logFileName)
+	logFile, err := os.Create(logFilePath)
+	if err != nil {
+		s.T().Logf("Error: failed to create balance log file: %v", err)
+		return
+	}
+	defer logFile.Close()
+
+	// Write header
+	logFile.WriteString("═══════════════════════════════════════════════════════════════════════════\n")
+	logFile.WriteString("                         BALANCE CHANGES LOG\n")
+	logFile.WriteString(fmt.Sprintf("                         Generated: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	logFile.WriteString("═══════════════════════════════════════════════════════════════════════════\n\n")
+
+	totalAccountsChanged := 0
+	totalDenomChanges := 0
+
+	// Use the first node client to query from production network
+	if len(s.nodeClients) == 0 {
+		logFile.WriteString("Error: No node clients available to query balances\n")
+		s.T().Log("Error: No node clients available")
+		return
+	}
+	nodeClient := s.nodeClients[0]
+
+	// Check if node is healthy before querying
+	if !nodeClient.IsHealthy() {
+		logFile.WriteString("Error: Node 0 is not healthy/running\n")
+		s.T().Log("Error: Node 0 is not healthy")
+		return
+	}
+	s.T().Logf("Node 0 is healthy (gRPC: %s)", nodeClient.GRPCAddr)
+
+	// Test gRPC connection with a simple query
+	testAddr := s.keyring.GetKey(0).AccAddr
+	testResp, testErr := nodeClient.GetAllBalances(testAddr)
+	if testErr != nil {
+		logFile.WriteString(fmt.Sprintf("Error: Failed to query balances from node 0: %v\n", testErr))
+		s.T().Logf("Error testing gRPC connection: %v", testErr)
+		return
+	}
+	s.T().Logf("✓ gRPC connection working, test account has %d balance entries", len(testResp.Balances))
+
+	// Debug: Log test account balances
+	if len(testResp.Balances) > 0 {
+		s.T().Log("Test account balances:")
+		for _, coin := range testResp.Balances {
+			s.T().Logf("  - %s: %s", coin.Denom, coin.Amount.String())
+		}
+	}
+
+	// Check balance changes for all accounts
+	for i := 0; i < numUsers; i++ {
+		key := s.keyring.GetKey(i)
+		addr := key.AccAddr
+
+		// Get current balances from production network
+		currentBalancesResp, err := nodeClient.GetAllBalances(addr)
+		if err != nil {
+			logFile.WriteString(fmt.Sprintf("Account %d (%s): Error fetching current balances: %v\n\n", i, addr.String(), err))
+			continue
+		}
+
+		// Get initial balances
+		initialDenoms, hasInitial := s.initialBalances[addr.String()]
+		if !hasInitial {
+			logFile.WriteString(fmt.Sprintf("Account %d (%s): No initial balance record\n\n", i, addr.String()))
+			continue
+		}
+
+		// Track changes for this account
+		currentDenoms := make(map[string]string)
+		for _, coin := range currentBalancesResp.Balances {
+			currentDenoms[coin.Denom] = coin.Amount.String()
+		}
+
+		// Find all denoms (union of initial and current)
+		allDenoms := make(map[string]bool)
+		for denom := range initialDenoms {
+			allDenoms[denom] = true
+		}
+		for denom := range currentDenoms {
+			allDenoms[denom] = true
+		}
+
+		// Check if any balance changed
+		hasChanges := false
+		changes := make(map[string]struct{ before, after, diff string })
+
+		for denom := range allDenoms {
+			initialStr := initialDenoms[denom]
+			currentStr := currentDenoms[denom]
+
+			if initialStr == "" {
+				initialStr = "0"
+			}
+			if currentStr == "" {
+				currentStr = "0"
+			}
+
+			if initialStr != currentStr {
+				hasChanges = true
+
+				// Calculate difference
+				initial := new(big.Int)
+				initial.SetString(initialStr, 10)
+				current := new(big.Int)
+				current.SetString(currentStr, 10)
+				diff := new(big.Int).Sub(current, initial)
+
+				diffStr := diff.String()
+				if diff.Sign() > 0 {
+					diffStr = "+" + diffStr
+				}
+
+				changes[denom] = struct{ before, after, diff string }{
+					before: initialStr,
+					after:  currentStr,
+					diff:   diffStr,
+				}
+				totalDenomChanges++
+			}
+		}
+
+		// Write account changes if any
+		if hasChanges {
+			totalAccountsChanged++
+			logFile.WriteString(fmt.Sprintf("Account %d: %s\n", i, addr.String()))
+			logFile.WriteString("───────────────────────────────────────────────────────────────────────────\n")
+
+			for denom, change := range changes {
+				logFile.WriteString(fmt.Sprintf("  %s:\n", denom))
+				logFile.WriteString(fmt.Sprintf("    Before: %s\n", change.before))
+				logFile.WriteString(fmt.Sprintf("    After:  %s\n", change.after))
+				logFile.WriteString(fmt.Sprintf("    Change: %s\n", change.diff))
+			}
+			logFile.WriteString("\n")
+		}
+	}
+
+	// Write summary
+	logFile.WriteString("═══════════════════════════════════════════════════════════════════════════\n")
+	logFile.WriteString("                              SUMMARY\n")
+	logFile.WriteString("═══════════════════════════════════════════════════════════════════════════\n")
+	logFile.WriteString(fmt.Sprintf("Total Accounts with Changes: %d / %d\n", totalAccountsChanged, numUsers))
+	logFile.WriteString(fmt.Sprintf("Total Denomination Changes: %d\n", totalDenomChanges))
+	logFile.WriteString(fmt.Sprintf("Accounts with No Changes: %d\n", numUsers-totalAccountsChanged))
+	logFile.WriteString("═══════════════════════════════════════════════════════════════════════════\n")
+
+	s.T().Logf("✓ Balance changes logged to: %s", logFilePath)
+	s.T().Logf("  - Accounts with changes: %d / %d", totalAccountsChanged, numUsers)
+	s.T().Logf("  - Total denomination changes: %d\n", totalDenomChanges)
 }
