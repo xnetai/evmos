@@ -4,6 +4,7 @@
 package loadtest
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -131,8 +132,13 @@ func (s *LocalNodesContractLoadTestSuite) SetupSuite() {
 	require.NoError(s.T(), err, "failed to deploy contract")
 	s.T().Logf("✓ Contract deployed at: %s\n", s.contractAddr.Hex())
 
-	// Step 6: Create NodeClient for each validator's gRPC port
-	s.T().Log("Step 6: Creating gRPC clients for each validator...")
+	// Step 6: Wait for gRPC servers to be fully ready
+	s.T().Log("Step 6: Waiting for gRPC servers to be fully available...")
+	time.Sleep(5 * time.Second)
+	s.T().Log("✓ Wait complete\n")
+
+	// Step 7: Create NodeClient for each validator's gRPC port
+	s.T().Log("Step 7: Creating gRPC clients for each validator...")
 	s.nodeClients = make([]*NodeClient, numValidators)
 	for i, validator := range s.prodNetwork.validators {
 		client, err := NewNodeClient(validator)
@@ -141,30 +147,30 @@ func (s *LocalNodesContractLoadTestSuite) SetupSuite() {
 		s.T().Logf("✓ Created client for validator %d (gRPC: %s)\n", i, client.GRPCAddr)
 	}
 
-	// Step 7: Initialize statistics tracker
-	s.T().Log("\nStep 7: Initializing statistics tracker...")
+	// Step 8: Initialize statistics tracker
+	s.T().Log("\nStep 8: Initializing statistics tracker...")
 	s.stats = NewLocalLoadTestStats(numValidators)
 	s.T().Log("✓ Statistics tracker initialized\n")
 
-	// Step 8: Initialize round-robin distributor
-	s.T().Log("Step 8: Initializing round-robin distributor...")
+	// Step 9: Initialize round-robin distributor
+	s.T().Log("Step 9: Initializing round-robin distributor...")
 	s.distributor = NewRoundRobinDistributor(numValidators)
 	s.T().Log("✓ Round-robin distributor initialized\n")
 
-	// Step 9: Initialize transaction builders
-	s.T().Log("Step 9: Initializing transaction builders...")
+	// Step 10: Initialize transaction builders
+	s.T().Log("Step 10: Initializing transaction builders...")
 	s.contractBuilder = NewContractTxBuilder(s.contractAddr)
 	s.bankBuilder = NewBankTxBuilder(s.keyring)
 	s.stakingBuilder = NewStakingTxBuilder(s.validators)
 	s.rawEVMBuilder = NewRawEVMTxBuilder(s.keyring)
 	s.T().Log("✓ Transaction builders initialized\n")
 
-	// Step 10: Initialize nonce tracker
-	s.T().Log("Step 10: Initializing nonce tracker (all accounts start at nonce 0)...")
+	// Step 11: Initialize nonce tracker
+	s.T().Log("Step 11: Initializing nonce tracker (all accounts start at nonce 0)...")
 	s.nonceTracker = NewNonceTracker()
 	s.T().Log("✓ Nonce tracker initialized\n")
 
-	s.T().Log("Step 11: Capturing initial account balances...")
+	s.T().Log("Step 12: Capturing initial account balances...")
 	s.captureInitialBalances()
 	s.T().Log("✓ Initial balances captured\n")
 
@@ -183,7 +189,24 @@ func (s *LocalNodesContractLoadTestSuite) TearDownSuite() {
 	// Since we use BroadcastTxAsync, transactions may still be in mempool
 	// Wait for several blocks to be produced to ensure inclusion
 	s.T().Log("Waiting for transactions to be included in blocks...")
-	time.Sleep(10 * time.Second)
+
+	// Query initial block height
+	if len(s.nodeClients) > 0 {
+		initialStatus, err := s.nodeClients[0].rpcClient.Status(context.Background())
+		if err == nil {
+			initialHeight := initialStatus.SyncInfo.LatestBlockHeight
+			s.T().Logf("Current block height: %d", initialHeight)
+			s.T().Log("Waiting 20 seconds for ~10 blocks to be produced...")
+			time.Sleep(20 * time.Second)
+
+			finalStatus, err := s.nodeClients[0].rpcClient.Status(context.Background())
+			if err == nil {
+				finalHeight := finalStatus.SyncInfo.LatestBlockHeight
+				blocksProduced := finalHeight - initialHeight
+				s.T().Logf("New block height: %d (+%d blocks)", finalHeight, blocksProduced)
+			}
+		}
+	}
 	s.T().Log("✓ Wait complete\n")
 
 	// Print final comprehensive statistics
@@ -414,7 +437,32 @@ func (s *LocalNodesContractLoadTestSuite) captureInitialBalances() {
 
 	nodeClient := s.nodeClients[0]
 
+	// Wait for gRPC to be ready with retries
+	maxRetries := 30
+	retryDelay := 1 * time.Second
+	var testErr error
+
+	s.T().Log("Waiting for gRPC connection to be ready...")
+	for retry := 0; retry < maxRetries; retry++ {
+		testAddr := s.keyring.GetKey(0).AccAddr
+		_, testErr = nodeClient.GetAllBalances(testAddr)
+		if testErr == nil {
+			s.T().Logf("✓ gRPC connection ready after %d attempts (%.1f seconds)", retry+1, float64(retry+1))
+			break
+		}
+		if retry < maxRetries-1 {
+			time.Sleep(retryDelay)
+		}
+	}
+
+	if testErr != nil {
+		s.T().Logf("Warning: gRPC connection failed after %d retries (%d seconds): %v", maxRetries, maxRetries, testErr)
+		s.T().Log("Will not be able to capture initial balances or verify balance changes")
+		return
+	}
+
 	// Capture balances for all 100 user accounts
+	successCount := 0
 	for i := 0; i < numUsers; i++ {
 		key := s.keyring.GetKey(i)
 		addr := key.AccAddr
@@ -432,9 +480,21 @@ func (s *LocalNodesContractLoadTestSuite) captureInitialBalances() {
 			denomBalances[coin.Denom] = coin.Amount.String()
 		}
 		s.initialBalances[addr.String()] = denomBalances
+		successCount++
 	}
 
-	s.T().Logf("Captured initial balances for %d accounts", len(s.initialBalances))
+	s.T().Logf("Captured initial balances for %d/%d accounts", successCount, numUsers)
+
+	// Log sample of first account for verification
+	if successCount > 0 {
+		firstAddr := s.keyring.GetKey(0).AccAddr.String()
+		if balances, ok := s.initialBalances[firstAddr]; ok {
+			s.T().Log("Sample - Account 0 initial balances:")
+			for denom, amount := range balances {
+				s.T().Logf("  %s: %s", denom, amount)
+			}
+		}
+	}
 }
 
 // logBalanceChanges logs all balance changes to a file
