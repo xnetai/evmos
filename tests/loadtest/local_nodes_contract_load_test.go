@@ -180,8 +180,10 @@ func (s *LocalNodesContractLoadTestSuite) TearDownSuite() {
 	s.T().Log("╚════════════════════════════════════════════════════════════╝\n")
 
 	// Wait a moment for any pending transactions to settle
-	s.T().Log("Waiting for transactions to settle...")
-	time.Sleep(2 * time.Second)
+	// Since we use BroadcastTxAsync, transactions may still be in mempool
+	// Wait for several blocks to be produced to ensure inclusion
+	s.T().Log("Waiting for transactions to be included in blocks...")
+	time.Sleep(10 * time.Second)
 	s.T().Log("✓ Wait complete\n")
 
 	// Print final comprehensive statistics
@@ -517,6 +519,12 @@ func (s *LocalNodesContractLoadTestSuite) logBalanceChanges() {
 		currentDenoms := make(map[string]string)
 		for _, coin := range currentBalancesResp.Balances {
 			currentDenoms[coin.Denom] = coin.Amount.String()
+		}
+
+		// Debug: Log first account's balances in detail
+		if i == 0 {
+			s.T().Logf("Account 0 initial balances: %v", initialDenoms)
+			s.T().Logf("Account 0 current balances: %v", currentDenoms)
 		}
 
 		// Find all denoms (union of initial and current)

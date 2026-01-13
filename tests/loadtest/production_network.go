@@ -159,6 +159,12 @@ func NewProductionNetworkWithAccounts(numValidators int, kr keyring.Keyring) (*P
 		return nil, err
 	}
 
+	// Enable gRPC in app.toml for all validators
+	if err := pn.enableGRPC(); err != nil {
+		os.RemoveAll(baseDir)
+		return nil, fmt.Errorf("failed to enable gRPC: %w", err)
+	}
+
 	// Fund additional accounts in genesis if keyring provided
 	if kr != nil {
 		fmt.Printf("Funding %d additional accounts in genesis...\n", len(kr.GetKeys()))
@@ -350,6 +356,63 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		}
 
 		fmt.Printf("Validator %d persistent_peers successfully updated\n", i)
+	}
+
+	return nil
+}
+
+// enableGRPC enables gRPC in app.toml for all validators
+func (pn *ProductionNetwork) enableGRPC() error {
+	for i := 0; i < len(pn.validators); i++ {
+		appConfigPath := filepath.Join(pn.validators[i].NodeDir, "config", "app.toml")
+
+		// Read app.toml file
+		appConfigData, err := os.ReadFile(appConfigPath)
+		if err != nil {
+			return fmt.Errorf("failed to read app.toml for validator %d: %w", i, err)
+		}
+
+		// Replace enable = false with enable = true in [grpc] section
+		appConfigStr := string(appConfigData)
+		lines := strings.Split(appConfigStr, "\n")
+		inGRPCSection := false
+		grpcEnableReplaced := false
+
+		for idx, line := range lines {
+			trimmed := strings.TrimSpace(line)
+
+			// Detect [grpc] section
+			if trimmed == "[grpc]" {
+				inGRPCSection = true
+				continue
+			}
+
+			// Exit [grpc] section when we hit another section
+			if inGRPCSection && strings.HasPrefix(trimmed, "[") && trimmed != "[grpc]" {
+				inGRPCSection = false
+			}
+
+			// Replace enable = false with enable = true in [grpc] section
+			if inGRPCSection && strings.HasPrefix(trimmed, "enable = ") && !strings.HasPrefix(trimmed, "#") && !grpcEnableReplaced {
+				oldValue := line
+				lines[idx] = "enable = true"
+				fmt.Printf("Validator %d: Replacing '%s' with 'enable = true' in [grpc] section\n", i, strings.TrimSpace(oldValue))
+				grpcEnableReplaced = true
+			}
+		}
+
+		if !grpcEnableReplaced {
+			return fmt.Errorf("failed to find enable line in [grpc] section of app.toml for validator %d", i)
+		}
+
+		appConfigStr = strings.Join(lines, "\n")
+
+		// Write back app.toml file
+		if err := os.WriteFile(appConfigPath, []byte(appConfigStr), 0644); err != nil {
+			return fmt.Errorf("failed to write app.toml for validator %d: %w", i, err)
+		}
+
+		fmt.Printf("Validator %d gRPC enabled in app.toml\n", i)
 	}
 
 	return nil
