@@ -361,9 +361,11 @@ func (pn *ProductionNetwork) fundAccountsInGenesis(kr keyring.Keyring) error {
 	balances := make([]banktypes.Balance, len(kr.GetKeys()))
 	for i, key := range kr.GetKeys() {
 		// Fund each account with the same denoms as the test
+		// Include aevmos for gas fees (EVM transactions use base denom)
 		coins := sdk.NewCoins(
 			sdk.NewCoin("abtc", sdkmath.NewInt(100000)),
 			sdk.NewCoin("aeth", sdkmath.NewInt(100000)),
+			sdk.NewCoin("aevmos", sdkmath.NewInt(1000000000000000000)), // 1 EVMOS = 10^18 aevmos
 			sdk.NewCoin("asol", sdkmath.NewInt(100000)),
 			sdk.NewCoin("txcoin", sdkmath.NewInt(1000000000)),
 			sdk.NewCoin("xusd", sdkmath.NewInt(100000)),
