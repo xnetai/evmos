@@ -236,8 +236,6 @@ func (s *LocalNodesContractLoadTestSuite) TestBasicLoad() {
 
 // TestIntensiveLoad runs an intensive load test with 10,000 transactions
 func (s *LocalNodesContractLoadTestSuite) TestIntensiveLoad() {
-	s.T().Skip("Skipping intensive load test - enable manually for stress testing")
-
 	s.T().Log("\n╔════════════════════════════════════════════════════════════╗")
 	s.T().Log("║     Test: Intensive Load (10,000 transactions)             ║")
 	s.T().Log("╚════════════════════════════════════════════════════════════╝\n")
