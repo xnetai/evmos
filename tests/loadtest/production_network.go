@@ -595,7 +595,10 @@ func (pn *ProductionNetwork) startValidators() error {
 			"--grpc.enable", "true", // Enable gRPC server
 			"--json-rpc.address", fmt.Sprintf("0.0.0.0:%d", val.JSONRPCPort),
 			"--json-rpc.ws-address", fmt.Sprintf("0.0.0.0:%d", val.JSONRPCPort+1),
-			"--minimum-gas-prices", "0txcoin", // Use txcoin for testing chain (evmos_9002-1)
+			"--json-rpc.api", "eth,txpool,personal,net,debug,web3", // Enable all EVM JSON-RPC APIs
+			"--api.enable", "true",                                  // Enable REST API
+			"--log_level", "info",                                   // Set log level for better debugging
+			"--minimum-gas-prices", "0txcoin",                       // Use txcoin for testing chain (evmos_9002-1)
 		}
 
 		// Create command
