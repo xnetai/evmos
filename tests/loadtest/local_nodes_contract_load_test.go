@@ -60,6 +60,9 @@ type LocalNodesContractLoadTestSuite struct {
 	stakingBuilder  *StakingTxBuilder
 	rawEVMBuilder   *RawEVMTxBuilder
 
+	// Nonce tracker for account nonce management
+	nonceTracker *NonceTracker
+
 	// Validators (for staking operations)
 	validators []stakingtypes.Validator
 }
@@ -149,6 +152,11 @@ func (s *LocalNodesContractLoadTestSuite) SetupSuite() {
 	s.stakingBuilder = NewStakingTxBuilder(s.validators)
 	s.rawEVMBuilder = NewRawEVMTxBuilder(s.keyring)
 	s.T().Log("✓ Transaction builders initialized\n")
+
+	// Step 10: Initialize nonce tracker
+	s.T().Log("Step 10: Initializing nonce tracker (all accounts start at nonce 0)...")
+	s.nonceTracker = NewNonceTracker()
+	s.T().Log("✓ Nonce tracker initialized\n")
 
 	s.T().Log("\n╔════════════════════════════════════════════════════════════╗")
 	s.T().Log("║     Setup Complete - Ready for Load Testing               ║")
@@ -268,13 +276,17 @@ func (s *LocalNodesContractLoadTestSuite) runLoadTest(numTxs int) {
 		userIdx := i % numUsers
 		user := s.keyring.GetKey(userIdx)
 
+		// Get and increment nonce for this user
+		fromAddr := common.BytesToAddress(user.Priv.PubKey().Address().Bytes())
+		nonce := s.nonceTracker.GetAndIncrementNonce(fromAddr)
+
 		// Select target node (round-robin)
 		nodeIdx := s.distributor.GetNextNode()
 		nodeClient := s.nodeClients[nodeIdx]
 
-		// Build transaction
+		// Build transaction with explicit nonce
 		submitTime := time.Now()
-		txBytes, metadata, err := txBuilder.BuildTx(user, s.factory, nil)
+		txBytes, metadata, err := txBuilder.BuildTx(user, s.factory, nil, nonce)
 		if err != nil {
 			s.T().Logf("Error building tx %d: %v\n", i, err)
 			errorCount++

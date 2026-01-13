@@ -15,8 +15,8 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
-	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
 	commonfactory "github.com/evmos/evmos/v20/testutil/integration/common/factory"
+	"github.com/evmos/evmos/v20/testutil/integration/evmos/factory"
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
 	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
 )
@@ -27,6 +27,7 @@ type TransactionBuilder interface {
 		user keyring.Key,
 		txFactory factory.TxFactory,
 		extraData interface{},
+		nonce uint64,
 	) ([]byte, TxMetadata, error)
 	GetType() TxType
 }
@@ -48,6 +49,7 @@ func (b *ContractTxBuilder) BuildTx(
 	user keyring.Key,
 	txFactory factory.TxFactory,
 	extraData interface{},
+	nonce uint64,
 ) ([]byte, TxMetadata, error) {
 	metadata := TxMetadata{
 		Type:      TxTypeContract,
@@ -70,8 +72,9 @@ func (b *ContractTxBuilder) BuildTx(
 
 	// Build EVM transaction args
 	txArgs := evmtypes.EvmTxArgs{
+		Nonce:     nonce, // Use provided nonce from tracker
 		To:        &b.contractAddr,
-		GasLimit:  500000, // Sufficient for 10 trades
+		GasLimit:  500000,                    // Sufficient for 10 trades
 		GasFeeCap: big.NewInt(1000000000000), // 1000 gwei
 		GasTipCap: big.NewInt(1000000000),    // 1 gwei
 		Amount:    totalFee,
@@ -122,6 +125,7 @@ func (b *BankTxBuilder) BuildTx(
 	user keyring.Key,
 	txFactory factory.TxFactory,
 	extraData interface{},
+	nonce uint64,
 ) ([]byte, TxMetadata, error) {
 	metadata := TxMetadata{
 		Type:      TxTypeBank,
@@ -146,7 +150,7 @@ func (b *BankTxBuilder) BuildTx(
 	msg := banktypes.NewMsgSend(user.AccAddr, receiver, coins)
 
 	// Build transaction
-	gas := uint64(100000) // Standard gas for bank transfer
+	gas := uint64(100000)                  // Standard gas for bank transfer
 	gasPrice := sdkmath.NewInt(1000000000) // 1 gwei
 
 	txArgs := commonfactory.CosmosTxArgs{
@@ -194,6 +198,7 @@ func (b *StakingTxBuilder) BuildTx(
 	user keyring.Key,
 	txFactory factory.TxFactory,
 	extraData interface{},
+	nonce uint64,
 ) ([]byte, TxMetadata, error) {
 	metadata := TxMetadata{
 		Type:      TxTypeStaking,
@@ -220,7 +225,7 @@ func (b *StakingTxBuilder) BuildTx(
 	)
 
 	// Build transaction
-	gas := uint64(400000) // Standard gas for delegation
+	gas := uint64(400000)                  // Standard gas for delegation
 	gasPrice := sdkmath.NewInt(1000000000) // 1 gwei
 
 	txArgs := commonfactory.CosmosTxArgs{
@@ -268,6 +273,7 @@ func (b *RawEVMTxBuilder) BuildTx(
 	user keyring.Key,
 	txFactory factory.TxFactory,
 	extraData interface{},
+	nonce uint64,
 ) ([]byte, TxMetadata, error) {
 	metadata := TxMetadata{
 		Type:      TxTypeRawEVM,
@@ -289,9 +295,10 @@ func (b *RawEVMTxBuilder) BuildTx(
 
 	// Build EVM transaction args
 	txArgs := evmtypes.EvmTxArgs{
+		Nonce:     nonce, // Use provided nonce from tracker
 		To:        &receiver,
 		Amount:    amount,
-		GasLimit:  21000, // Standard gas for EVM transfer
+		GasLimit:  21000,                     // Standard gas for EVM transfer
 		GasFeeCap: big.NewInt(1000000000000), // 1000 gwei
 		GasTipCap: big.NewInt(1000000000),    // 1 gwei
 	}
