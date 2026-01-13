@@ -4,6 +4,7 @@
 package loadtest
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	sdkmath "cosmossdk.io/math"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/evmos/evmos/v20/testutil/integration/evmos/keyring"
 	"github.com/evmos/evmos/v20/testutil/integration/evmos/network"
 )
 
@@ -22,21 +27,21 @@ type ProductionNetwork struct {
 	validators []*ValidatorProcess
 	network    network.Network // Underlying integration network for setup
 	mutex      sync.Mutex
-	binaryPath string          // Cached path to the binary
-	binaryName string          // Name of the binary (xcoind or evmosd)
+	binaryPath string // Cached path to the binary
+	binaryName string // Name of the binary (xcoind or evmosd)
 }
 
 // ValidatorProcess represents a single validator running in its own process
 type ValidatorProcess struct {
-	Index      int
-	NodeDir    string
-	RPCPort    int
-	P2PPort    int
-	GRPCPort   int
-	APIPort    int
+	Index       int
+	NodeDir     string
+	RPCPort     int
+	P2PPort     int
+	GRPCPort    int
+	APIPort     int
 	JSONRPCPort int
-	Cmd        *exec.Cmd
-	LogFile    *os.File
+	Cmd         *exec.Cmd
+	LogFile     *os.File
 }
 
 // isHexString checks if a string contains only hexadecimal characters
@@ -123,6 +128,11 @@ func findOrBuildBinary() (binaryPath, binaryName string, err error) {
 
 // NewProductionNetwork creates a network with separate validator processes
 func NewProductionNetwork(numValidators int) (*ProductionNetwork, error) {
+	return NewProductionNetworkWithAccounts(numValidators, nil)
+}
+
+// NewProductionNetworkWithAccounts creates a network with additional funded accounts
+func NewProductionNetworkWithAccounts(numValidators int, kr keyring.Keyring) (*ProductionNetwork, error) {
 	// Create temporary directory for validator nodes
 	baseDir, err := os.MkdirTemp("", "evmos-loadtest-*")
 	if err != nil {
@@ -147,6 +157,16 @@ func NewProductionNetwork(numValidators int) (*ProductionNetwork, error) {
 	if err := pn.initValidatorConfigs(numValidators); err != nil {
 		os.RemoveAll(baseDir)
 		return nil, err
+	}
+
+	// Fund additional accounts in genesis if keyring provided
+	if kr != nil {
+		fmt.Printf("Funding %d additional accounts in genesis...\n", len(kr.GetKeys()))
+		if err := pn.fundAccountsInGenesis(kr); err != nil {
+			os.RemoveAll(baseDir)
+			return nil, fmt.Errorf("failed to fund accounts in genesis: %w", err)
+		}
+		fmt.Printf("✓ Funded %d accounts in genesis\n", len(kr.GetKeys()))
 	}
 
 	// Start each validator in its own process
@@ -222,7 +242,7 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 			line = strings.TrimSpace(line)
 			// Skip empty lines and lines that start with WARNING, INFO, ERROR, etc.
 			if line == "" || strings.HasPrefix(line, "WARNING") || strings.HasPrefix(line, "WARN") ||
-			   strings.HasPrefix(line, "INFO") || strings.HasPrefix(line, "ERROR") {
+				strings.HasPrefix(line, "INFO") || strings.HasPrefix(line, "ERROR") {
 				continue
 			}
 			// Node ID should be exactly 40 hex characters
@@ -330,6 +350,157 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 		}
 
 		fmt.Printf("Validator %d persistent_peers successfully updated\n", i)
+	}
+
+	return nil
+}
+
+// fundAccountsInGenesis adds funded accounts to all validator genesis files
+func (pn *ProductionNetwork) fundAccountsInGenesis(kr keyring.Keyring) error {
+	// Define balances for each account
+	balances := make([]banktypes.Balance, len(kr.GetKeys()))
+	for i, key := range kr.GetKeys() {
+		// Fund each account with the same denoms as the test
+		coins := sdk.NewCoins(
+			sdk.NewCoin("abtc", sdkmath.NewInt(100000)),
+			sdk.NewCoin("aeth", sdkmath.NewInt(100000)),
+			sdk.NewCoin("asol", sdkmath.NewInt(100000)),
+			sdk.NewCoin("txcoin", sdkmath.NewInt(1000000000)),
+			sdk.NewCoin("xusd", sdkmath.NewInt(100000)),
+		)
+		balances[i] = banktypes.Balance{
+			Address: key.AccAddr.String(),
+			Coins:   coins,
+		}
+	}
+
+	// Modify genesis file for each validator
+	daemonHome := pn.binaryName
+	for i := 0; i < len(pn.validators); i++ {
+		nodeDir := filepath.Join(pn.baseDir, fmt.Sprintf("node%d", i), daemonHome)
+		genesisPath := filepath.Join(nodeDir, "config", "genesis.json")
+
+		// Read genesis file
+		genesisBytes, err := os.ReadFile(genesisPath)
+		if err != nil {
+			return fmt.Errorf("failed to read genesis file for validator %d: %w", i, err)
+		}
+
+		// Parse genesis
+		var genesis map[string]interface{}
+		if err := json.Unmarshal(genesisBytes, &genesis); err != nil {
+			return fmt.Errorf("failed to parse genesis for validator %d: %w", i, err)
+		}
+
+		// Get app_state
+		appState, ok := genesis["app_state"].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("invalid app_state in genesis for validator %d", i)
+		}
+
+		// Get bank module
+		bankState, ok := appState["bank"].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("invalid bank state in genesis for validator %d", i)
+		}
+
+		// Get existing balances
+		existingBalances := []interface{}{}
+		if balancesRaw, ok := bankState["balances"].([]interface{}); ok {
+			existingBalances = balancesRaw
+		}
+
+		// Calculate and update total supply
+		// Start with existing supply from all existing balances (including validator accounts)
+		supply := make(map[string]sdkmath.Int)
+
+		// First, sum up all existing balances to get the baseline supply
+		for _, balRaw := range existingBalances {
+			if balMap, ok := balRaw.(map[string]interface{}); ok {
+				if coinsRaw, ok := balMap["coins"].([]interface{}); ok {
+					for _, coinRaw := range coinsRaw {
+						if coinMap, ok := coinRaw.(map[string]interface{}); ok {
+							denom, ok1 := coinMap["denom"].(string)
+							amountStr, ok2 := coinMap["amount"].(string)
+							if ok1 && ok2 {
+								amount, ok := sdkmath.NewIntFromString(amountStr)
+								if ok {
+									if existing, exists := supply[denom]; exists {
+										supply[denom] = existing.Add(amount)
+									} else {
+										supply[denom] = amount
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Add our new balances
+		for _, balance := range balances {
+			// Convert coins to JSON format
+			coinsJSON := make([]map[string]interface{}, len(balance.Coins))
+			for j, coin := range balance.Coins {
+				coinsJSON[j] = map[string]interface{}{
+					"denom":  coin.Denom,
+					"amount": coin.Amount.String(),
+				}
+			}
+
+			balanceJSON := map[string]interface{}{
+				"address": balance.Address,
+				"coins":   coinsJSON,
+			}
+			existingBalances = append(existingBalances, balanceJSON)
+
+			// Add to supply
+			for _, coin := range balance.Coins {
+				if existing, ok := supply[coin.Denom]; ok {
+					supply[coin.Denom] = existing.Add(coin.Amount)
+				} else {
+					supply[coin.Denom] = coin.Amount
+				}
+			}
+		}
+
+		bankState["balances"] = existingBalances
+
+		// Convert supply back to JSON format (sorted by denom)
+		supplyJSON := make([]map[string]interface{}, 0, len(supply))
+		denoms := make([]string, 0, len(supply))
+		for denom := range supply {
+			denoms = append(denoms, denom)
+		}
+		// Sort denoms alphabetically (CRITICAL!)
+		for i := 0; i < len(denoms); i++ {
+			for j := i + 1; j < len(denoms); j++ {
+				if denoms[i] > denoms[j] {
+					denoms[i], denoms[j] = denoms[j], denoms[i]
+				}
+			}
+		}
+		for _, denom := range denoms {
+			supplyJSON = append(supplyJSON, map[string]interface{}{
+				"denom":  denom,
+				"amount": supply[denom].String(),
+			})
+		}
+
+		bankState["supply"] = supplyJSON
+
+		// Write back genesis file
+		genesisBytes, err = json.MarshalIndent(genesis, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal genesis for validator %d: %w", i, err)
+		}
+
+		if err := os.WriteFile(genesisPath, genesisBytes, 0644); err != nil {
+			return fmt.Errorf("failed to write genesis for validator %d: %w", i, err)
+		}
+
+		fmt.Printf("✓ Validator %d: Added %d funded accounts to genesis\n", i, len(balances))
 	}
 
 	return nil
@@ -465,8 +636,8 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 					logStr := string(logContent)
 					// Check for signs of active consensus/block production
 					if strings.Contains(logStr, "indexed block") ||
-					   strings.Contains(logStr, "committed state") ||
-					   strings.Contains(logStr, "Finalizing commit") {
+						strings.Contains(logStr, "committed state") ||
+						strings.Contains(logStr, "Finalizing commit") {
 						readyCount++
 						continue
 					}
