@@ -99,21 +99,24 @@ func (nc *NodeClient) SubmitTx(txBytes []byte) (*abcitypes.ExecTxResult, error) 
 	// Create CometBFT transaction
 	tx := cmttypes.Tx(txBytes)
 
-	// Broadcast transaction asynchronously (don't wait for block inclusion)
+	// Broadcast transaction synchronously to get immediate validation feedback
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := nc.rpcClient.BroadcastTxAsync(ctx, tx)
+	result, err := nc.rpcClient.BroadcastTxSync(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to broadcast tx to node %d: %w", nc.ValidatorIndex, err)
 	}
 
-	// BroadcastTxAsync just returns the hash, transaction will be processed later
-	// Return success with Code 0
+	// BroadcastTxSync returns CheckTx result - check if transaction was accepted
 	execResult := &abcitypes.ExecTxResult{
-		Code: 0,
-		Data: nil,
-		Log:  fmt.Sprintf("tx broadcasted with hash: %s", result.Hash.String()),
+		Code: result.Code,
+		Data: result.Data,
+		Log:  result.Log,
+	}
+
+	if result.Code != 0 {
+		return execResult, fmt.Errorf("transaction rejected by mempool (code %d): %s", result.Code, result.Log)
 	}
 
 	// Calculate latency
