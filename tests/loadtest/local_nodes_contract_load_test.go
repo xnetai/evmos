@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -85,6 +86,11 @@ func (s *LocalNodesContractLoadTestSuite) SetupSuite() {
 	s.T().Log("║     Local Nodes Contract Load Test - Setup                ║")
 	s.T().Log("╚════════════════════════════════════════════════════════════╝\n")
 
+	// Step 0: Kill any existing evmosd/xcoind processes from previous runs
+	s.T().Log("Step 0: Cleaning up any existing node processes...")
+	s.killExistingNodeProcesses()
+	s.T().Log("✓ Cleanup complete\n")
+
 	// Initialize random seed
 	rand.Seed(time.Now().UnixNano())
 
@@ -93,18 +99,16 @@ func (s *LocalNodesContractLoadTestSuite) SetupSuite() {
 	s.keyring = keyring.New(numUsers)
 	s.T().Logf("✓ Created keyring with %d users\n", numUsers)
 
-	// Step 2: Create integration network for transaction building
-	// This network is used only for building transactions, not for execution
-	s.T().Log("Step 2: Creating integration network for transaction utilities...")
+	// Step 2: Create integration network for contract deployment and validator info
+	// NOTE: We will NOT use this network's gRPC for transaction building
+	s.T().Log("Step 2: Creating integration network for contract deployment...")
 	s.integrationNetwork = network.New(
 		network.WithChainID("evmos_9002-1"), // Must match ProductionNetwork chain ID
 		network.WithPreFundedAccounts(s.keyring.GetAllAccAddrs()...),
 		network.WithAmountOfValidators(numValidators),
 		network.WithOtherDenoms([]string{"abtc", "aeth", "asol", "xusd"}),
 	)
-	s.grpcHandler = grpc.NewIntegrationHandler(s.integrationNetwork)
-	s.factory = factory.New(s.integrationNetwork, s.grpcHandler)
-	s.T().Log("✓ Integration network created for transaction building\n")
+	s.T().Log("✓ Integration network created\n")
 
 	// Get validators for staking operations
 	s.validators = s.integrationNetwork.GetValidators()
@@ -121,24 +125,13 @@ func (s *LocalNodesContractLoadTestSuite) SetupSuite() {
 	// Print validator information
 	s.T().Log(s.prodNetwork.PrintValidatorInfo())
 
-	// Step 4: Wait for network to be ready
+	// Step 4: Wait for network to be ready and verify all nodes
 	s.T().Log("Step 4: Waiting for validators to stabilize...")
-	time.Sleep(5 * time.Second)
+	time.Sleep(15 * time.Second)
 	s.T().Log("✓ Validators stabilized\n")
 
-	// Step 5: Deploy BatchOrderBook contract (using integration network)
-	s.T().Log("Step 5: Deploying BatchOrderBook contract...")
-	err = s.deployContract()
-	require.NoError(s.T(), err, "failed to deploy contract")
-	s.T().Logf("✓ Contract deployed at: %s\n", s.contractAddr.Hex())
-
-	// Step 6: Wait for gRPC servers to be fully ready
-	s.T().Log("Step 6: Waiting for gRPC servers to be fully available...")
-	time.Sleep(5 * time.Second)
-	s.T().Log("✓ Wait complete\n")
-
-	// Step 7: Create NodeClient for each validator's gRPC port
-	s.T().Log("Step 7: Creating gRPC clients for each validator...")
+	// Step 4b: Create NodeClient for each validator's gRPC port
+	s.T().Log("Step 4b: Creating gRPC clients for each validator...")
 	s.nodeClients = make([]*NodeClient, numValidators)
 	for i, validator := range s.prodNetwork.validators {
 		client, err := NewNodeClient(validator)
@@ -147,36 +140,78 @@ func (s *LocalNodesContractLoadTestSuite) SetupSuite() {
 		s.T().Logf("✓ Created client for validator %d (gRPC: %s)\n", i, client.GRPCAddr)
 	}
 
-	// Step 8: Initialize statistics tracker
-	s.T().Log("\nStep 8: Initializing statistics tracker...")
+	// Step 4c: Verify all nodes are running and healthy
+	s.T().Log("\nStep 4c: Verifying all nodes are running and healthy...")
+	err = s.verifyAllNodesHealthy()
+	require.NoError(s.T(), err, "failed to verify all nodes are healthy")
+	s.T().Log("✓ All nodes verified healthy\n")
+
+	// Step 5: Create grpcHandler and factory pointing to PRODUCTION network
+	s.T().Log("Step 5: Creating factory with production network gRPC...")
+	prodGrpcAddr := fmt.Sprintf("127.0.0.1:%d", s.prodNetwork.validators[0].GRPCPort)
+	prodHandler, err := NewProductionGrpcHandler(prodGrpcAddr)
+	require.NoError(s.T(), err, "failed to create production grpc handler")
+	s.grpcHandler = prodHandler
+	s.factory = factory.New(s.integrationNetwork, s.grpcHandler)
+	s.T().Logf("✓ Factory created with production gRPC: %s\n", prodGrpcAddr)
+
+	// Step 6: Deploy BatchOrderBook contract (using integration network)
+	s.T().Log("\nStep 6: Deploying BatchOrderBook contract...")
+	err = s.deployContract()
+	require.NoError(s.T(), err, "failed to deploy contract")
+	s.T().Logf("✓ Contract deployed at: %s\n", s.contractAddr.Hex())
+
+	// Step 7: Initialize statistics tracker
+	s.T().Log("\nStep 7: Initializing statistics tracker...")
 	s.stats = NewLocalLoadTestStats(numValidators)
 	s.T().Log("✓ Statistics tracker initialized\n")
 
-	// Step 9: Initialize round-robin distributor
-	s.T().Log("Step 9: Initializing round-robin distributor...")
+	// Step 8: Initialize round-robin distributor
+	s.T().Log("Step 8: Initializing round-robin distributor...")
 	s.distributor = NewRoundRobinDistributor(numValidators)
 	s.T().Log("✓ Round-robin distributor initialized\n")
 
-	// Step 10: Initialize transaction builders
-	s.T().Log("Step 10: Initializing transaction builders...")
+	// Step 9: Initialize transaction builders
+	s.T().Log("Step 9: Initializing transaction builders...")
 	s.contractBuilder = NewContractTxBuilder(s.contractAddr)
 	s.bankBuilder = NewBankTxBuilder(s.keyring)
 	s.stakingBuilder = NewStakingTxBuilder(s.validators)
 	s.rawEVMBuilder = NewRawEVMTxBuilder(s.keyring)
 	s.T().Log("✓ Transaction builders initialized\n")
 
-	// Step 11: Initialize nonce tracker
-	s.T().Log("Step 11: Initializing nonce tracker (all accounts start at nonce 0)...")
+	// Step 10: Initialize nonce tracker
+	s.T().Log("Step 10: Initializing nonce tracker (all accounts start at nonce 0)...")
 	s.nonceTracker = NewNonceTracker()
 	s.T().Log("✓ Nonce tracker initialized\n")
 
-	s.T().Log("Step 12: Capturing initial account balances...")
+	s.T().Log("Step 11: Capturing initial account balances...")
 	s.captureInitialBalances()
 	s.T().Log("✓ Initial balances captured\n")
 
 	s.T().Log("\n╔════════════════════════════════════════════════════════════╗")
 	s.T().Log("║     Setup Complete - Ready for Load Testing               ║")
 	s.T().Log("╚════════════════════════════════════════════════════════════╝\n")
+}
+
+// killExistingNodeProcesses kills any existing evmosd/xcoind processes from previous test runs
+func (s *LocalNodesContractLoadTestSuite) killExistingNodeProcesses() {
+	// Kill evmosd processes
+	if output, err := exec.Command("pkill", "-9", "evmosd").CombinedOutput(); err != nil {
+		// pkill returns error if no processes found, which is fine
+		s.T().Logf("  evmosd cleanup: %v (output: %s)", err, string(output))
+	} else {
+		s.T().Log("  Killed existing evmosd processes")
+	}
+
+	// Kill xcoind processes
+	if output, err := exec.Command("pkill", "-9", "xcoind").CombinedOutput(); err != nil {
+		s.T().Logf("  xcoind cleanup: %v (output: %s)", err, string(output))
+	} else {
+		s.T().Log("  Killed existing xcoind processes")
+	}
+
+	// Give OS time to release ports
+	time.Sleep(2 * time.Second)
 }
 
 // TearDownSuite cleans up after all tests
@@ -261,7 +296,9 @@ func (s *LocalNodesContractLoadTestSuite) deployContract() error {
 	contractAddr, err := s.factory.DeployContract(
 		user.Priv,
 		evmtypes.EvmTxArgs{
-			GasLimit: 3000000, // Sufficient for contract deployment
+			GasLimit:   3000000,                     // Sufficient for contract deployment
+			GasFeeCap:  big.NewInt(10000000000),     // 10 Gwei - high enough to handle base fee fluctuations
+			GasTipCap:  big.NewInt(1),               // 1 wei tip
 		},
 		deploymentData,
 	)
@@ -271,6 +308,90 @@ func (s *LocalNodesContractLoadTestSuite) deployContract() error {
 
 	s.contractAddr = contractAddr
 	return nil
+}
+
+// verifyAllNodesHealthy checks that all nodes are running and responding to requests
+func (s *LocalNodesContractLoadTestSuite) verifyAllNodesHealthy() error {
+	s.T().Log("Checking health of all nodes (will retry for up to 60 seconds)...")
+	
+	maxRetries := 60
+	retryDelay := 1 * time.Second
+	testAddr := s.keyring.GetKey(0).AccAddr
+	
+	// Track which nodes are healthy
+	nodeHealthy := make([]bool, len(s.nodeClients))
+	
+	// Retry for each node until all are healthy or we timeout
+	for retry := 0; retry < maxRetries; retry++ {
+		allHealthy := true
+		healthyCount := 0
+		
+		for i, nodeClient := range s.nodeClients {
+			// Skip if already healthy
+			if nodeHealthy[i] {
+				healthyCount++
+				continue
+			}
+			
+			// Check RPC health
+			if !nodeClient.IsHealthy() {
+				if retry == 0 || (retry+1)%20 == 0 {
+					s.T().Logf("  Node %d: RPC health check failed (RPC: %s)", i, nodeClient.RPCAddr)
+				}
+				allHealthy = false
+				continue
+			}
+			
+			// Check gRPC by querying a test account
+			_, err := nodeClient.GetAllBalances(testAddr)
+			if err != nil {
+				allHealthy = false
+				continue
+			}
+			
+			// Check block height is progressing
+			height, err := nodeClient.GetBlockHeight()
+			if err != nil {
+				allHealthy = false
+				continue
+			}
+			
+			// Node is healthy!
+			nodeHealthy[i] = true
+			healthyCount++
+			s.T().Logf("  ✓ Node %d: Healthy (RPC: %s, gRPC: %s, Height: %d)", 
+				i, nodeClient.RPCAddr, nodeClient.GRPCAddr, height)
+		}
+		
+		if allHealthy {
+			s.T().Logf("All %d nodes are healthy and responding", len(s.nodeClients))
+			return nil
+		}
+		
+		// Log progress every 10 seconds
+		if retry == 0 || (retry+1)%10 == 0 || retry == maxRetries-1 {
+			s.T().Logf("  Waiting for nodes to be ready: %d/%d healthy (attempt %d/%d)", 
+				healthyCount, len(s.nodeClients), retry+1, maxRetries)
+		}
+		
+		// Wait before next retry
+		if retry < maxRetries-1 {
+			time.Sleep(retryDelay)
+		}
+	}
+	
+	// Final check - report which nodes are not healthy
+	healthyCount := 0
+	for i := range s.nodeClients {
+		if nodeHealthy[i] {
+			healthyCount++
+		} else {
+			s.T().Logf("  ✗ Node %d: NOT healthy after %d seconds", i, maxRetries)
+		}
+	}
+	
+	return fmt.Errorf("not all nodes are healthy (%d/%d healthy) after %d seconds", 
+		healthyCount, len(s.nodeClients), maxRetries)
 }
 
 // TestBasicLoad runs a basic load test with 1,000 transactions
@@ -463,6 +584,7 @@ func (s *LocalNodesContractLoadTestSuite) captureInitialBalances() {
 
 	// Capture balances for all 100 user accounts
 	successCount := 0
+	failedAccounts := []int{}
 	for i := 0; i < numUsers; i++ {
 		key := s.keyring.GetKey(i)
 		addr := key.AccAddr
@@ -471,6 +593,7 @@ func (s *LocalNodesContractLoadTestSuite) captureInitialBalances() {
 		balancesResp, err := nodeClient.GetAllBalances(addr)
 		if err != nil {
 			s.T().Logf("Warning: failed to get initial balances for account %d (%s): %v", i, addr.String(), err)
+			failedAccounts = append(failedAccounts, i)
 			continue
 		}
 
@@ -484,6 +607,11 @@ func (s *LocalNodesContractLoadTestSuite) captureInitialBalances() {
 	}
 
 	s.T().Logf("Captured initial balances for %d/%d accounts", successCount, numUsers)
+	if len(failedAccounts) > 0 && len(failedAccounts) <= 10 {
+		s.T().Logf("Failed accounts: %v", failedAccounts)
+	} else if len(failedAccounts) > 10 {
+		s.T().Logf("Failed %d accounts (too many to list)", len(failedAccounts))
+	}
 
 	// Log sample of first account for verification
 	if successCount > 0 {
@@ -521,6 +649,8 @@ func (s *LocalNodesContractLoadTestSuite) logBalanceChanges() {
 
 	totalAccountsChanged := 0
 	totalDenomChanges := 0
+	accountsWithNoInitial := 0
+	accountsWithQueryErrors := 0
 
 	// Use the first node client to query from production network
 	if len(s.nodeClients) == 0 {
@@ -565,6 +695,7 @@ func (s *LocalNodesContractLoadTestSuite) logBalanceChanges() {
 		currentBalancesResp, err := nodeClient.GetAllBalances(addr)
 		if err != nil {
 			logFile.WriteString(fmt.Sprintf("Account %d (%s): Error fetching current balances: %v\n\n", i, addr.String(), err))
+			accountsWithQueryErrors++
 			continue
 		}
 
@@ -572,6 +703,7 @@ func (s *LocalNodesContractLoadTestSuite) logBalanceChanges() {
 		initialDenoms, hasInitial := s.initialBalances[addr.String()]
 		if !hasInitial {
 			logFile.WriteString(fmt.Sprintf("Account %d (%s): No initial balance record\n\n", i, addr.String()))
+			accountsWithNoInitial++
 			continue
 		}
 
@@ -655,12 +787,21 @@ func (s *LocalNodesContractLoadTestSuite) logBalanceChanges() {
 	logFile.WriteString("═══════════════════════════════════════════════════════════════════════════\n")
 	logFile.WriteString("                              SUMMARY\n")
 	logFile.WriteString("═══════════════════════════════════════════════════════════════════════════\n")
-	logFile.WriteString(fmt.Sprintf("Total Accounts with Changes: %d / %d\n", totalAccountsChanged, numUsers))
+	logFile.WriteString(fmt.Sprintf("Total Accounts Checked: %d\n", numUsers))
+	logFile.WriteString(fmt.Sprintf("Accounts with Changes: %d (%.1f%%)\n", totalAccountsChanged, float64(totalAccountsChanged)/float64(numUsers)*100))
+	logFile.WriteString(fmt.Sprintf("Accounts with No Changes: %d (%.1f%%)\n", numUsers-totalAccountsChanged, float64(numUsers-totalAccountsChanged)/float64(numUsers)*100))
+	logFile.WriteString(fmt.Sprintf("Accounts with No Initial Balance: %d\n", accountsWithNoInitial))
+	logFile.WriteString(fmt.Sprintf("Accounts with Query Errors: %d\n", accountsWithQueryErrors))
 	logFile.WriteString(fmt.Sprintf("Total Denomination Changes: %d\n", totalDenomChanges))
-	logFile.WriteString(fmt.Sprintf("Accounts with No Changes: %d\n", numUsers-totalAccountsChanged))
 	logFile.WriteString("═══════════════════════════════════════════════════════════════════════════\n")
 
 	s.T().Logf("✓ Balance changes logged to: %s", logFilePath)
-	s.T().Logf("  - Accounts with changes: %d / %d", totalAccountsChanged, numUsers)
-	s.T().Logf("  - Total denomination changes: %d\n", totalDenomChanges)
+	s.T().Logf("  - Accounts with changes: %d / %d (%.1f%%)", totalAccountsChanged, numUsers, float64(totalAccountsChanged)/float64(numUsers)*100)
+	s.T().Logf("  - Total denomination changes: %d", totalDenomChanges)
+	if accountsWithNoInitial > 0 {
+		s.T().Logf("  - Accounts with no initial balance: %d", accountsWithNoInitial)
+	}
+	if accountsWithQueryErrors > 0 {
+		s.T().Logf("  - Accounts with query errors: %d", accountsWithQueryErrors)
+	}
 }

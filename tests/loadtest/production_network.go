@@ -361,7 +361,7 @@ func (pn *ProductionNetwork) initValidatorConfigs(numValidators int) error {
 	return nil
 }
 
-// enableGRPC enables gRPC in app.toml for all validators
+// enableGRPC enables gRPC in app.toml and sets unique API address for all validators
 func (pn *ProductionNetwork) enableGRPC() error {
 	for i := 0; i < len(pn.validators); i++ {
 		appConfigPath := filepath.Join(pn.validators[i].NodeDir, "config", "app.toml")
@@ -373,10 +373,13 @@ func (pn *ProductionNetwork) enableGRPC() error {
 		}
 
 		// Replace enable = false with enable = true in [grpc] section
+		// Also set unique API address for each validator
 		appConfigStr := string(appConfigData)
 		lines := strings.Split(appConfigStr, "\n")
 		inGRPCSection := false
+		inAPISection := false
 		grpcEnableReplaced := false
+		apiAddressReplaced := false
 
 		for idx, line := range lines {
 			trimmed := strings.TrimSpace(line)
@@ -384,12 +387,23 @@ func (pn *ProductionNetwork) enableGRPC() error {
 			// Detect [grpc] section
 			if trimmed == "[grpc]" {
 				inGRPCSection = true
+				inAPISection = false
 				continue
 			}
 
-			// Exit [grpc] section when we hit another section
-			if inGRPCSection && strings.HasPrefix(trimmed, "[") && trimmed != "[grpc]" {
+			// Detect [api] section
+			if trimmed == "[api]" {
+				inAPISection = true
 				inGRPCSection = false
+				continue
+			}
+
+			// Exit section when we hit another section
+			if strings.HasPrefix(trimmed, "[") && !strings.HasSuffix(trimmed, "]") == false {
+				if trimmed != "[grpc]" && trimmed != "[api]" {
+					inGRPCSection = false
+					inAPISection = false
+				}
 			}
 
 			// Replace enable = false with enable = true in [grpc] section
@@ -398,6 +412,15 @@ func (pn *ProductionNetwork) enableGRPC() error {
 				lines[idx] = "enable = true"
 				fmt.Printf("Validator %d: Replacing '%s' with 'enable = true' in [grpc] section\n", i, strings.TrimSpace(oldValue))
 				grpcEnableReplaced = true
+			}
+
+			// Set unique API address for each validator
+			if inAPISection && strings.HasPrefix(trimmed, "address = ") && !strings.HasPrefix(trimmed, "#") && !apiAddressReplaced {
+				apiPort := pn.validators[i].APIPort
+				newAddress := fmt.Sprintf("address = \"tcp://127.0.0.1:%d\"", apiPort)
+				fmt.Printf("Validator %d: Setting API address to port %d\n", i, apiPort)
+				lines[idx] = newAddress
+				apiAddressReplaced = true
 			}
 		}
 
@@ -555,6 +578,34 @@ func (pn *ProductionNetwork) fundAccountsInGenesis(kr keyring.Keyring) error {
 
 		bankState["supply"] = supplyJSON
 
+		// Also add accounts to auth module
+		authState, ok := appState["auth"].(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("invalid auth state in genesis for validator %d", i)
+		}
+
+		existingAccounts := []interface{}{}
+		if accountsRaw, ok := authState["accounts"].([]interface{}); ok {
+			existingAccounts = accountsRaw
+		}
+
+		// Add auth accounts for funded accounts (EthAccount type)
+		for _, key := range kr.GetKeys() {
+			ethAccount := map[string]interface{}{
+				"@type":        "/ethermint.types.v1.EthAccount",
+				"base_account": map[string]interface{}{
+					"address":        key.AccAddr.String(),
+					"pub_key":        nil,
+					"account_number": "0",
+					"sequence":       "0",
+				},
+				"code_hash": "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470", // Empty code hash
+			}
+			existingAccounts = append(existingAccounts, ethAccount)
+		}
+
+		authState["accounts"] = existingAccounts
+
 		// Write back genesis file
 		genesisBytes, err = json.MarshalIndent(genesis, "", "  ")
 		if err != nil {
@@ -592,7 +643,8 @@ func (pn *ProductionNetwork) startValidators() error {
 			"--rpc.laddr", fmt.Sprintf("tcp://0.0.0.0:%d", val.RPCPort),
 			"--p2p.laddr", fmt.Sprintf("tcp://0.0.0.0:%d", val.P2PPort),
 			"--grpc.address", fmt.Sprintf("0.0.0.0:%d", val.GRPCPort),
-			"--grpc.enable", "true",                                 // Enable gRPC server
+			"--grpc.enable",                                         // Enable gRPC server (boolean flag, no value)
+			"--rpc.pprof_laddr", fmt.Sprintf("127.0.0.1:%d", 6060+(val.Index*10)), // Unique pprof port per validator
 			"--json-rpc.address", fmt.Sprintf("0.0.0.0:%d", val.JSONRPCPort),
 			"--json-rpc.ws-address", fmt.Sprintf("0.0.0.0:%d", val.JSONRPCPort+1),
 			"--json-rpc.api", "eth,txpool,personal,net,debug,web3", // Enable all EVM JSON-RPC APIs
@@ -646,14 +698,14 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 					fmt.Printf("  Status: RUNNING\n")
 				}
 
-				// Check if port is listening
-				cmd := exec.Command("ss", "-tln")
+				// Check if port is listening using lsof (macOS compatible)
+				cmd := exec.Command("lsof", "-iTCP", "-sTCP:LISTEN", "-P", "-n")
 				output, err := cmd.CombinedOutput()
 				portStr := fmt.Sprintf(":%d", val.RPCPort)
 				if err == nil && strings.Contains(string(output), portStr) {
 					fmt.Printf("  RPC Port %d: LISTENING\n", val.RPCPort)
 				} else {
-					fmt.Printf("  RPC Port %d: NOT DETECTED (ss error: %v)\n", val.RPCPort, err)
+					fmt.Printf("  RPC Port %d: NOT DETECTED (lsof error: %v)\n", val.RPCPort, err)
 				}
 
 				// Print last 50 lines of log
@@ -711,8 +763,8 @@ func (pn *ProductionNetwork) waitForNetwork() error {
 					}
 				}
 
-				// Fallback: Check if port is listening using ss command
-				cmd := exec.Command("ss", "-tln")
+				// Fallback: Check if port is listening using lsof (macOS compatible)
+				cmd := exec.Command("lsof", "-iTCP", "-sTCP:LISTEN", "-P", "-n")
 				output, err := cmd.CombinedOutput()
 				if err == nil {
 					portStr := fmt.Sprintf(":%d", val.RPCPort)

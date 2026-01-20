@@ -62,18 +62,15 @@ func NewNodeClient(validator *ValidatorProcess) (*NodeClient, error) {
 		return nil, fmt.Errorf("failed to create gRPC connection to %s: %w", grpcAddr, err)
 	}
 
-	// Create CometBFT RPC client
-	rpcClient, err := rpchttp.New(rpcAddr, "/websocket")
+	// Create CometBFT RPC client (empty endpoint for non-websocket HTTP mode)
+	rpcClient, err := rpchttp.New(rpcAddr, "")
 	if err != nil {
 		grpcConn.Close()
 		return nil, fmt.Errorf("failed to create RPC client to %s: %w", rpcAddr, err)
 	}
 
-	// Start the RPC client
-	if err := rpcClient.Start(); err != nil {
-		grpcConn.Close()
-		return nil, fmt.Errorf("failed to start RPC client: %w", err)
-	}
+	// Note: Don't call Start() when not using websocket mode
+	// Start() is only needed for websocket subscriptions
 
 	client := &NodeClient{
 		ValidatorIndex: validator.Index,
@@ -223,8 +220,12 @@ func (nc *NodeClient) IsHealthy() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	_, err := nc.rpcClient.Status(ctx)
-	return err == nil
+	status, err := nc.rpcClient.Status(ctx)
+	if err != nil {
+		return false
+	}
+	// Also verify we got a valid response
+	return status != nil && status.SyncInfo.LatestBlockHeight > 0
 }
 
 // GetAllBalances queries all balances for an address from this node
